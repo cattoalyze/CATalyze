@@ -1,0 +1,20 @@
+# Environments
+.venv/
+__pycache__/
+*.pyc
+
+# Data (gitignored per brief)
+data/raw/
+data/processed/
+
+# Trained artifacts (gitignored per brief)
+artifacts/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Secrets
+.env
+kaggle.json

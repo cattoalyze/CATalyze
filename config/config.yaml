@@ -1,0 +1,92 @@
+# CATalyze — central configuration. No magic numbers in code; everything
+# that could plausibly need tuning lives here.
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  artifacts: "artifacts"
+  reports: "reports"
+
+  crawford_images_dir: "data/raw/crawford/images"
+  crawford_annotations_dir: "data/raw/crawford/annotations"
+
+  mood_labels_csv: "data/processed/mood_labels.csv"
+  keypoints_csv: "data/processed/keypoints.csv"
+  features_csv: "data/processed/geometric_features.csv"
+
+  keypoint_model: "artifacts/keypoint_model.pt"
+  mood_cnn_model: "artifacts/mood_cnn_model.pt"
+  ensemble_model: "artifacts/ensemble_model.joblib"
+
+seed: 42
+
+mood_classes: ["ALERT", "ANXIOUS", "PLAYFUL", "RELAXED"]
+
+keypoints:
+  # Crawford 9-point scheme: left eye, right eye, mouth,
+  # left ear (base, tip, other-side), right ear (base, tip, other-side)
+  names:
+    - left_eye
+    - right_eye
+    - mouth
+    - left_ear_1
+    - left_ear_2
+    - left_ear_3
+    - right_ear_1
+    - right_ear_2
+    - right_ear_3
+  num_keypoints: 9
+  input_size: 224            # square input resolution fed to backbone
+  heatmap_size: 56            # output heatmap resolution (input_size / 4)
+  gaussian_sigma: 1.5         # px, at heatmap resolution
+  backbone: "mobilenet_v2"
+  freeze_backbone_epochs: 5   # backbone frozen for this many epochs before unfreezing
+  finetune_last_n_layers: 30
+  batch_size: 32
+  epochs: 40
+  learning_rate: 1.0e-3
+  finetune_learning_rate: 1.0e-4
+  val_split: 0.15
+  test_split: 0.15
+  early_stopping_patience: 6
+
+features:
+  eye_distance_floor_px: 1.0   # avoid divide-by-zero when normalizing by head width
+
+mood_cnn:
+  backbone: "mobilenet_v2"
+  input_size: 224
+  freeze_backbone_epochs: 5
+  finetune_last_n_layers: 30
+  batch_size: 32
+  epochs: 30
+  learning_rate: 1.0e-3
+  finetune_learning_rate: 1.0e-4
+  val_split: 0.15
+  test_split: 0.15
+  early_stopping_patience: 6
+  embedding_dim: 1280   # MobileNetV2 GAP output width
+
+labeling:
+  seed_target_per_class: 100   # aim for ~100 human labels per mood class
+  pseudo_label_confidence_threshold:
+    ALERT: 0.85
+    ANXIOUS: 0.75    # lower bar: class is scarce, accept more pseudo-labels
+    PLAYFUL: 0.85
+    RELAXED: 0.85
+  self_training_max_rounds: 3
+
+ensemble:
+  rf_n_estimators: 300
+  rf_max_depth: 12
+  calibration_method: "sigmoid"
+  calibration_cv: 5
+  smote_k_neighbors_max: 5   # will be reduced automatically if a class is smaller than this
+  test_split: 0.2
+  val_split: 0.15
+
+serving:
+  host: "0.0.0.0"
+  port: 8000
+  max_upload_mb: 10
+  allowed_content_types: ["image/jpeg", "image/png", "image/webp"]
