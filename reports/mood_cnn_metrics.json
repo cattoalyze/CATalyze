@@ -1,0 +1,11 @@
+{
+  "best_val_acc": 0.9039121482498285,
+  "test_acc": 0.8963623884694578,
+  "seed_labeled_only_test_acc": 0.7419354838709677,
+  "n_test": 1457,
+  "n_test_seed_labeled": 62,
+  "provenance_breakdown": {
+    "pseudo": 9230,
+    "ai": 480
+  }
+}

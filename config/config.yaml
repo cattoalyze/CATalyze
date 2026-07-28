@@ -69,11 +69,16 @@ mood_cnn:
 
 labeling:
   seed_target_per_class: 100   # aim for ~100 human labels per mood class
+  # Original placeholders (0.75-0.85) were unreachable in practice: a mood
+  # CNN trained on 336 seed images rarely exceeds ~0.6 max-softmax confidence
+  # (measured empirically — see reports/ for the diagnostic). Lowered to
+  # roughly the observed 90th/75th percentile of pool confidences so
+  # self-training can proceed while still selecting only the confident tail.
   pseudo_label_confidence_threshold:
-    ALERT: 0.85
-    ANXIOUS: 0.75    # lower bar: class is scarce, accept more pseudo-labels
-    PLAYFUL: 0.85
-    RELAXED: 0.85
+    ALERT: 0.60
+    ANXIOUS: 0.50    # lower bar: class is scarce, accept more pseudo-labels
+    PLAYFUL: 0.60
+    RELAXED: 0.60
   self_training_max_rounds: 3
 
 ensemble:
