@@ -26,12 +26,15 @@ markdown-it-py==4.2.0
 markupsafe==3.0.3
 matplotlib==3.11.1
 mdurl==0.1.2
+ml-dtypes==0.5.4
 mpmath==1.3.0
 narwhals==2.24.0
 networkx==3.6.1
 numpy==2.4.6
 onnx==1.22.0
+onnx-ir==0.2.1
 onnxruntime==1.28.0
+onnxscript==0.7.1
 opencv-python==5.0.0.93
 optree==0.19.1
 packaging==26.2
@@ -39,6 +42,7 @@ pandas==3.0.5
 pillow==12.3.0
 pip==26.1.2
 pluggy==1.6.0
+protobuf==7.35.1
 pydantic==2.13.4
 pydantic-core==2.46.4
 pygments==2.20.0

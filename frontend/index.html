@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CATalyze — Cat Mood Demo</title>
+<style>
+  :root {
+    --bg: #FFF8F0;
+    --card: #FFFFFF;
+    --accent: #FFCBA4;
+    --accent-dark: #F5A76A;
+    --text: #3A3A3A;
+    --text-light: #7A7A7A;
+    --border: #F2E0CC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  main { width: 100%; max-width: 760px; }
+  h1 {
+    font-size: 1.8rem;
+    margin: 0 0 4px 0;
+    font-weight: 700;
+  }
+  .subtitle {
+    color: var(--text-light);
+    margin: 0 0 28px 0;
+    font-size: 0.95rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .upload-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  input[type=file] {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px;
+    border: 1px dashed var(--accent-dark);
+    border-radius: 10px;
+    background: #FFFDFB;
+  }
+  button {
+    font-family: inherit;
+    font-size: 0.95rem;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 22px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.1s ease, background 0.15s ease;
+  }
+  button:active { transform: scale(0.97); }
+  #analyzeBtn {
+    background: var(--accent-dark);
+    color: white;
+  }
+  #analyzeBtn:hover { background: #EE9752; }
+  #analyzeBtn:disabled { background: #E8D9C8; cursor: not-allowed; }
+  .samples {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .sample-thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s ease;
+  }
+  .sample-thumb:hover { border-color: var(--accent-dark); }
+  .samples-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    width: 100%;
+    margin-bottom: 2px;
+  }
+  #resultSection { display: none; }
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 600px) {
+    .results-grid { grid-template-columns: 1fr; }
+  }
+  .image-panel { position: relative; }
+  .image-panel canvas, .image-panel img.gradcam-img {
+    width: 100%;
+    border-radius: 12px;
+    display: block;
+    background: #eee;
+  }
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    justify-content: center;
+  }
+  .toggle-btn {
+    background: #FFF3E6;
+    color: var(--text);
+    font-size: 0.82rem;
+    padding: 6px 14px;
+  }
+  .toggle-btn.active {
+    background: var(--accent-dark);
+    color: white;
+  }
+  .bar-row {
+    margin-bottom: 14px;
+  }
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .bar-track {
+    height: 14px;
+    background: #FFF3E6;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    border-radius: 8px;
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+  .status {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-top: 12px;
+    min-height: 1.2em;
+  }
+  .status.error { color: #C0553C; }
+  footer {
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    margin-top: 24px;
+  }
+  footer a { color: var(--accent-dark); }
+</style>
+</head>
+<body>
+<main>
+  <h1>🐾 CATalyze</h1>
+  <p class="subtitle">Upload a cat photo — real predictions from the trained keypoint + mood-CNN + calibrated-ensemble pipeline.</p>
+
+  <div class="card">
+    <div class="upload-row">
+      <input type="file" id="fileInput" accept="image/*" />
+      <button id="analyzeBtn" disabled>Analyze</button>
+    </div>
+    <div class="samples">
+      <div class="samples-label">Or try a sample:</div>
+      <img class="sample-thumb" src="samples/alert.jpg" data-sample="alert.jpg" title="ALERT example" />
+      <img class="sample-thumb" src="samples/anxious.jpg" data-sample="anxious.jpg" title="ANXIOUS example" />
+      <img class="sample-thumb" src="samples/playful.jpg" data-sample="playful.jpg" title="PLAYFUL example" />
+      <img class="sample-thumb" src="samples/relaxed.jpg" data-sample="relaxed.jpg" title="RELAXED example" />
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card" id="resultSection">
+    <div class="results-grid">
+      <div class="image-panel">
+        <canvas id="keypointCanvas"></canvas>
+        <img id="gradcamImg" class="gradcam-img" style="display:none" />
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="btnKeypoints">Keypoints</button>
+          <button class="toggle-btn" id="btnGradcam">Grad-CAM</button>
+        </div>
+      </div>
+      <div id="bars"></div>
+    </div>
+  </div>
+
+  <footer id="metricsFooter"></footer>
+</main>
+
+<script>
+const API_BASE = ""; // same origin
+const classes = ["ALERT", "ANXIOUS", "PLAYFUL", "RELAXED"];
+const statusEl = document.getElementById("status");
+const analyzeBtn = document.getElementById("analyzeBtn");
+const fileInput = document.getElementById("fileInput");
+const resultSection = document.getElementById("resultSection");
+const canvas = document.getElementById("keypointCanvas");
+const gradcamImg = document.getElementById("gradcamImg");
+const btnKeypoints = document.getElementById("btnKeypoints");
+const btnGradcam = document.getElementById("btnGradcam");
+
+let currentFile = null;
+let currentImageURL = null;
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || "";
+  statusEl.className = "status" + (isError ? " error" : "");
+}
+
+async function fileFromSample(name) {
+  const resp = await fetch("samples/" + name);
+  const blob = await resp.blob();
+  return new File([blob], name, { type: blob.type || "image/jpeg" });
+}
+
+document.querySelectorAll(".sample-thumb").forEach((el) => {
+  el.addEventListener("click", async () => {
+    const name = el.dataset.sample;
+    setStatus("Loading sample…");
+    currentFile = await fileFromSample(name);
+    currentImageURL = URL.createObjectURL(currentFile);
+    analyzeBtn.disabled = false;
+    setStatus('Sample "' + name.replace(".jpg", "") + '" loaded. Click Analyze.');
+  });
+});
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files && fileInput.files[0]) {
+    currentFile = fileInput.files[0];
+    currentImageURL = URL.createObjectURL(currentFile);
+    analyzeBtn.disabled = false;
+    setStatus("Image selected. Click Analyze.");
+  }
+});
+
+function drawKeypoints(imageURL, keypoints) {
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    ctx.fillStyle = "rgba(255,90,50,0.9)";
+    keypoints.forEach((kp) => {
+      ctx.beginPath();
+      ctx.arc(kp.x, kp.y, Math.max(3, img.width * 0.01), 0, 2 * Math.PI);
+      ctx.fill();
+    });
+  };
+  img.src = imageURL;
+}
+
+function renderBars(predictions) {
+  const barsDiv = document.getElementById("bars");
+  barsDiv.innerHTML = "";
+  const sorted = classes.slice().sort((a, b) => predictions[b] - predictions[a]);
+  sorted.forEach((cls) => {
+    const pct = (predictions[cls] * 100).toFixed(1);
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-label"><span>${cls}</span><span>${pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+    `;
+    barsDiv.appendChild(row);
+  });
+}
+
+function showKeypointsView() {
+  canvas.style.display = "block";
+  gradcamImg.style.display = "none";
+  btnKeypoints.classList.add("active");
+  btnGradcam.classList.remove("active");
+}
+function showGradcamView() {
+  canvas.style.display = "none";
+  gradcamImg.style.display = "block";
+  btnGradcam.classList.add("active");
+  btnKeypoints.classList.remove("active");
+}
+btnKeypoints.addEventListener("click", showKeypointsView);
+btnGradcam.addEventListener("click", showGradcamView);
+
+analyzeBtn.addEventListener("click", async () => {
+  if (!currentFile) return;
+  analyzeBtn.disabled = true;
+  setStatus("Running keypoint + mood CNN + ensemble pipeline…");
+  resultSection.style.display = "none";
+
+  try {
+    const fd1 = new FormData();
+    fd1.append("file", currentFile);
+    const predictResp = await fetch(API_BASE + "/predict", { method: "POST", body: fd1 });
+    if (!predictResp.ok) {
+      const err = await predictResp.json().catch(() => ({}));
+      throw new Error(err.detail || ("predict failed: " + predictResp.status));
+    }
+    const predictData = await predictResp.json();
+
+    const fd2 = new FormData();
+    fd2.append("file", currentFile);
+    const gradcamResp = await fetch(API_BASE + "/gradcam", { method: "POST", body: fd2 });
+    let gradcamData = null;
+    if (gradcamResp.ok) {
+      gradcamData = await gradcamResp.json();
+    }
+
+    drawKeypoints(currentImageURL, predictData.keypoints);
+    renderBars(predictData.predictions);
+    if (gradcamData) {
+      gradcamImg.src = "data:image/png;base64," + gradcamData.overlay_png_base64;
+    }
+    showKeypointsView();
+    resultSection.style.display = "block";
+    setStatus("Done.");
+  } catch (e) {
+    setStatus(String(e.message || e), true);
+  } finally {
+    analyzeBtn.disabled = false;
+  }
+});
+
+// Real metrics from reports/metrics.json via the API — never hardcoded.
+(async () => {
+  try {
+    const resp = await fetch(API_BASE + "/metrics");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const acc = data?.ensemble?.seed_labeled_only_calibrated_accuracy;
+    const n = data?.ensemble?.n_test_seed_labeled;
+    if (acc != null) {
+      document.getElementById("metricsFooter").textContent =
+        `Ensemble seed-labeled-only accuracy: ${(acc * 100).toFixed(1)}% (n=${n}) — from reports/metrics.json`;
+    }
+  } catch (e) { /* metrics footer is optional */ }
+})();
+</script>
+</body>
+</html>

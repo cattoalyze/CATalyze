@@ -1,0 +1,64 @@
+{
+  "mood_cnn": {
+    "latency_ms": {
+      "pytorch_cpu": {
+        "mean_ms": 20.837474998552352,
+        "std_ms": 9.706921011240869,
+        "n_runs": 100
+      },
+      "onnx_fp32_cpu": {
+        "mean_ms": 4.123425984289497,
+        "std_ms": 1.5251212064394752,
+        "n_runs": 100
+      },
+      "onnx_int8_cpu": {
+        "mean_ms": 98.33349799970165,
+        "std_ms": 12.480755566751355,
+        "n_runs": 100
+      }
+    },
+    "size_mb": {
+      "pytorch_state_dict_mb": 9.162827,
+      "onnx_fp32_mb": 9.096264,
+      "onnx_int8_mb": 2.443016,
+      "fp32_to_int8_reduction_pct": 73.14264405694469
+    },
+    "seed_labeled_only_accuracy": {
+      "pytorch": 0.7419354838709677,
+      "onnx_fp32": 0.7419354838709677,
+      "onnx_int8": 0.6935483870967742,
+      "n_test": 62
+    }
+  },
+  "keypoint_model": {
+    "latency_ms": {
+      "pytorch_cpu": {
+        "mean_ms": 42.824359990190715,
+        "std_ms": 7.371048434624027,
+        "n_runs": 100
+      },
+      "onnx_fp32_cpu": {
+        "mean_ms": 10.650834992993623,
+        "std_ms": 0.911742862681592,
+        "n_runs": 100
+      },
+      "onnx_int8_cpu": {
+        "mean_ms": 109.5397019945085,
+        "std_ms": 14.995912120172445,
+        "n_runs": 100
+      }
+    },
+    "size_mb": {
+      "pytorch_state_dict_mb": 32.75346,
+      "onnx_fp32_mb": 32.685027,
+      "onnx_int8_mb": 26.043472,
+      "fp32_to_int8_reduction_pct": 20.319870012651354
+    },
+    "nme_on_subsample": {
+      "pytorch": 0.23366346937837093,
+      "onnx_fp32": 0.23366346937837093,
+      "onnx_int8": 0.24743082226733204,
+      "n_samples": 200
+    }
+  }
+}

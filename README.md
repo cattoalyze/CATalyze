@@ -31,7 +31,10 @@ catalyze/
 │   ├── mood_cnn/                 # MobileNetV2 mood classifier
 │   ├── labeling/                 # seed labeling UI + self-training
 │   ├── ensemble/                 # RF + CalibratedClassifierCV
-│   └── serving/                  # FastAPI /predict endpoint
+│   ├── serving/                  # FastAPI /predict, /gradcam, /metrics
+│   ├── explainability/            # Grad-CAM
+│   └── optimization/              # ONNX export + INT8 quantization + benchmark
+├── frontend/                    # static demo page (served by the API)
 ├── tests/
 ├── reports/                     # auto-generated metrics + visualizations
 └── requirements.txt
@@ -67,7 +70,10 @@ uv run python -m src.labeling.self_training           # pseudo-labels the rest
 uv run python -m src.features.extract_features        # geometric features for all labeled images
 uv run python -m src.ensemble.evaluate                # trains + evaluates the ensemble
 uv run python -m src.reports.generate_metrics          # consolidates reports/metrics.json
-uv run uvicorn src.serving.api:app --port 8000         # serve /predict
+uv run python -m src.explainability.verify_gradcam     # Grad-CAM verification grid
+uv run python -m src.optimization.export_onnx          # ONNX export + INT8 quantization
+uv run python -m src.optimization.benchmark            # real size/latency/accuracy comparison
+uv run uvicorn src.serving.api:app --port 8000         # serve /predict + demo frontend at /
 ```
 
 Run tests with `uv run pytest tests/ -v`.
@@ -84,6 +90,10 @@ contract — verified end-to-end against a real image:
   "geometric_features": {"left_ear_angle": -0.59, ...}
 }
 ```
+
+`POST /gradcam` (same multipart contract) returns a base64-encoded PNG
+overlay plus the mood CNN's own (uncalibrated) raw view of the image.
+`GET /metrics` serves `reports/metrics.json` verbatim.
 
 `GET /health` returns model-load status. Non-image uploads and uploads over
 `serving.max_upload_mb` (config.yaml, default 10MB) are rejected with 400 —
@@ -179,3 +189,90 @@ environment as a real, demonstrated dependency-conflict risk not worth
 taking on for a stretch feature, and (2) disk/compute budget was ultimately
 fine (119.8GB free after the core pipeline), so this was a deliberate scope
 call, not a forced one. Ear-only geometric features are used throughout.
+
+## Grad-CAM (`src/explainability/gradcam.py`)
+
+Implemented against `MoodCNN.backbone[-1]` (the last conv block, 1280
+channels, the same feature map that gets pooled into the embedding).
+Verified visually on real predictions — 2 correct examples per class plus
+1 misclassification — in `reports/gradcam_verification.png`. All correct
+predictions show the heatmap focused on the cat's face/eyes/ears, not
+background clutter. The misclassified example (true=RELAXED, predicted
+ALERT at 0.97) is genuinely informative: Grad-CAM shows the model fixating
+tightly on the cat's wide, direct-staring eyes — a classic ALERT visual
+cue — which plausibly explains the error even though the ground truth
+(itself AI-assigned, not human-verified) was RELAXED. Exposed live via
+`POST /gradcam` on the serving API, and toggleable in the demo frontend.
+
+## ONNX export + INT8 quantization (`src/optimization/`)
+
+Both the mood CNN and the keypoint model were exported to ONNX and
+quantized (`src/optimization/export_onnx.py`), then benchmarked
+(`src/optimization/benchmark.py`) with real, measured numbers — latency
+averaged over 100 runs with 10 warmup runs, accuracy measured on the exact
+same seed-labeled-only test split used for the core pipeline's honest
+metrics. Full numbers in `reports/onnx_benchmark.json`.
+
+| | Mood CNN | Keypoint model |
+|---|---|---|
+| PyTorch CPU latency | 20.8 ms | 42.8 ms |
+| ONNX fp32 CPU latency | **4.1 ms** (5.1x faster) | **10.7 ms** (4.0x faster) |
+| ONNX INT8 CPU latency | 98.3 ms (4.7x **slower** than PyTorch) | 109.5 ms (2.6x **slower**) |
+| fp32 → int8 file size | 9.10 → 2.44 MB (−73.1%) | 32.69 → 26.04 MB (−20.3%) |
+| Accuracy, fp32 vs PyTorch | identical (74.19% both) | identical (NME 0.2337 both, 200-sample) |
+| Accuracy, int8 | 69.35% (**−4.8 pts**) | NME 0.2474 (**+0.014, worse**) |
+
+**Two honest, unglamorous findings, reported exactly as measured:**
+
+1. **ONNX export alone (no quantization) is a genuine, free win** —
+   ~4-5x lower CPU latency with *zero* accuracy change (fp32 ONNX matches
+   PyTorch exactly on both models' honest test metrics).
+2. **INT8 dynamic quantization made things worse on both axes here** —
+   slower *and* less accurate. This was measured, not assumed, and the
+   likely reason is architectural: `onnxruntime.quantization.quantize_dynamic`
+   is documented as most effective for MatMul/Gemm-heavy models
+   (transformers, RNNs); these are Conv-heavy MobileNetV2-based CNNs, where
+   the runtime quantize/dequantize overhead around each Conv op outweighs
+   any benefit, and weight-only dynamic quantization of Conv layers gives
+   up real accuracy without the calibrated activation quantization that
+   static quantization would provide. **The quantized models are not used
+   anywhere in the serving path** — this section exists to report a real,
+   measured (negative) result, not to ship a regression.
+
+A notable environment landmine hit along the way: PyTorch 2.13's default
+(dynamo-based) ONNX exporter, combined with `onnxruntime.quantization`'s
+internal shape-inference pass, produced a `ShapeInferenceError` on an
+otherwise valid, checker-passing, correctly-running graph — fixed by
+running onnxruntime's own recommended `quant_pre_process` step before
+quantization (documented in `export_onnx.py`).
+
+## Demo frontend (`frontend/index.html`)
+
+A single static HTML/CSS/JS page (no build step, no framework), served by
+the FastAPI app itself via a static-files mount — `uv run uvicorn
+src.serving.api:app --port 8000` and open `http://localhost:8000/`.
+Pastel orange/white palette (`#FFF8F0` background, `#FFCBA4`/`#F5A76A`
+accent, `#3A3A3A` text). Upload an image (or click one of 4 bundled sample
+images, one per mood class, each verified in advance to produce a
+confident, correct prediction from the real pipeline) and click Analyze:
+
+- Calls the real `/predict` endpoint and renders the 4 calibrated
+  confidence bars from its actual response — not a single deterministic
+  label.
+- Draws the 9 returned keypoints as dots on the uploaded image (canvas).
+- Calls the real `/gradcam` endpoint and offers a toggle between the
+  keypoints view and the Grad-CAM overlay.
+- Footer accuracy figure ("Ensemble seed-labeled-only accuracy: 83.3%") is
+  fetched live from `GET /metrics`, which serves `reports/metrics.json`
+  verbatim — never hardcoded or re-typed.
+
+Verified end-to-end in a real browser session against the real running
+API: sample image → real `/predict` + `/gradcam` calls → confidence bars
+render correctly (matched the independently-verified prediction for that
+image) → keypoints drawn on canvas (confirmed via pixel inspection, not
+just "no JS errors") → Grad-CAM toggle switches views correctly → metrics
+footer populated from the live API response.
+
+**What was deliberately left out**, per the brief: no dark mode, no stats
+dashboard, no training-pipeline panel, no PDF/CSV export, no fabricated or
+re-typed numbers anywhere on the page.
