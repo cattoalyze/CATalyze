@@ -170,3 +170,12 @@ curve tracks the ideal diagonal closely.
   accuracy), suggesting the geometric features do carry real signal beyond
   what the CNN already learns from raw pixels — a genuine architectural
   validation, not assumed.
+
+## Descoped: tail detection (Section 8 stretch)
+
+Not attempted. This is the pre-approved ear-only fallback, chosen for two
+reasons: (1) the brief itself flags MMPose/MMCV + an isolated NumPy<2
+environment as a real, demonstrated dependency-conflict risk not worth
+taking on for a stretch feature, and (2) disk/compute budget was ultimately
+fine (119.8GB free after the core pipeline), so this was a deliberate scope
+call, not a forced one. Ear-only geometric features are used throughout.
