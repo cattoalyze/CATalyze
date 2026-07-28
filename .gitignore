@@ -5,7 +5,10 @@ __pycache__/
 
 # Data (gitignored per brief)
 data/raw/
-data/processed/
+data/processed/*
+# Exception: committed so the full pipeline is runnable without redoing
+# the seed-labeling visual-review step (see RUN.md).
+!data/processed/mood_labels_seed.csv
 
 # Trained artifacts (gitignored per brief)
 artifacts/
