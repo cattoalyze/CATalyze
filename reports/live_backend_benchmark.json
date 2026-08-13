@@ -1,0 +1,30 @@
+{
+  "device": "cpu",
+  "live_tracker_pytorch_calibrated_ensemble": {
+    "mean_ms": 267.2587188399757,
+    "std_ms": 15.740616258444456,
+    "n_runs": 50,
+    "fps": 3.741692710121692
+  },
+  "live_tracker_pytorch_raw_ensemble": {
+    "mean_ms": 79.88360009999269,
+    "std_ms": 31.62981960502156,
+    "n_runs": 50,
+    "fps": 12.518213985702573
+  },
+  "keypoint_only_pytorch": {
+    "mean_ms": 14.639653020012702,
+    "std_ms": 1.1304388436526467,
+    "n_runs": 50
+  },
+  "keypoint_only_onnx_fp32": {
+    "mean_ms": 9.049592579995078,
+    "std_ms": 4.845933803305476,
+    "n_runs": 50
+  },
+  "keypoint_only_onnx_int8": {
+    "mean_ms": 51.34464821997426,
+    "std_ms": 5.762273575216982,
+    "n_runs": 50
+  }
+}

@@ -15,7 +15,7 @@ import cv2
 import joblib
 import numpy as np
 import torch
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
@@ -29,6 +29,8 @@ from src.keypoints.bbox import compute_boxes  # noqa: E402
 from src.keypoints.infer import KeypointPredictor  # noqa: E402
 from src.mood_cnn.dataset import IMAGENET_MEAN, IMAGENET_STD  # noqa: E402
 from src.mood_cnn.model import MoodCNN  # noqa: E402
+from src.serving.inference_backends import PyTorchBackend  # noqa: E402
+from src.serving.live_tracker import LiveTracker  # noqa: E402
 
 cfg = load_config()
 scfg = cfg["serving"]
@@ -66,6 +68,23 @@ def load_models():
     _state["ensemble_classes"] = list(ensemble_bundle["calibrated"].classes_)
 
     _state["gradcam"] = GradCAM(mood_model)
+
+    # Live-camera path (Section 2): raw (uncalibrated) ensemble, not the
+    # CalibratedClassifierCV used above — measured ~3.4x faster per frame
+    # (reports/live_backend_benchmark.json) since CalibratedClassifierCV's
+    # 5-fold internal calibration re-runs the whole 300-tree RF 5x per
+    # prediction. Accuracy cost is negligible (91.76% raw vs 91.81%
+    # calibrated) and EMA smoothing across frames further compensates for
+    # the less-calibrated per-frame probabilities.
+    _state["live_backend"] = PyTorchBackend(
+        keypoint_model=_state["keypoint_predictor"].model,
+        mood_model=mood_model,
+        input_size_kp=kcfg["input_size"],
+        heatmap_size=kcfg["heatmap_size"],
+        input_size_mood=mcfg["input_size"],
+        device=device,
+    )
+    _state["live_ensemble"] = ensemble_bundle["raw"]
 
 
 @app.get("/health")
@@ -138,6 +157,39 @@ async def gradcam(file: UploadFile = File(...)):
         "mood_cnn_predicted_class": class_names[class_idx],
         "mood_cnn_raw_probabilities": {c: float(p) for c, p in zip(class_names, probs)},
     }
+
+
+@app.websocket("/ws/live")
+async def live_ws(websocket: WebSocket):
+    """Live-camera path: client sends one JPEG/PNG-encoded frame per binary
+    message, server replies with one JSON prediction per frame — same
+    keypoint -> geometric-features + mood-CNN-embedding -> ensemble
+    pipeline as /predict, but with EMA smoothing across frames and the raw
+    (uncalibrated) ensemble for speed (see load_models() for why).
+
+    A fresh LiveTracker (and its EMA state) is created per connection so
+    concurrent clients don't smooth across each other's frames; the
+    underlying models/ensemble are shared read-only.
+    """
+    await websocket.accept()
+    tracker = LiveTracker(
+        backend=_state["live_backend"],
+        ensemble=_state["live_ensemble"],
+        ensemble_classes=_state["ensemble_classes"],
+    )
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            arr = np.frombuffer(data, dtype=np.uint8)
+            frame_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if frame_bgr is None:
+                await websocket.send_json({"error": "could not decode frame"})
+                continue
+            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            result = tracker.process_frame(frame_rgb)
+            await websocket.send_json(result)
+    except WebSocketDisconnect:
+        pass
 
 
 @app.get("/metrics")

@@ -202,6 +202,20 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="upload-row">
+      <button id="liveBtn">Start Live Camera</button>
+      <span class="status" id="liveStatus"></span>
+    </div>
+    <div id="livePanel" style="display:none; margin-top:14px;">
+      <div class="image-panel">
+        <video id="liveVideo" autoplay playsinline muted style="display:none"></video>
+        <canvas id="liveCanvas" style="width:100%; border-radius:12px; background:#000;"></canvas>
+      </div>
+      <div id="liveBars" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
   <footer id="metricsFooter"></footer>
 </main>
 
@@ -375,6 +389,155 @@ analyzeBtn.addEventListener("click", async () => {
   } finally {
     analyzeBtn.disabled = false;
   }
+});
+
+// --- Live camera (Section 2): streams webcam frames to /ws/live over a
+// WebSocket, one JPEG-encoded frame per message, server replies with one
+// JSON prediction (smoothed keypoints/boxes/predictions or
+// cat_detected:false) per frame. Frames are sent only after the previous
+// response arrives (no queuing), so the achieved rate is the server's real
+// per-frame throughput, not an arbitrary client-side timer.
+const liveBtn = document.getElementById("liveBtn");
+const liveStatus = document.getElementById("liveStatus");
+const livePanel = document.getElementById("livePanel");
+const liveVideo = document.getElementById("liveVideo");
+const liveCanvas = document.getElementById("liveCanvas");
+const liveBars = document.getElementById("liveBars");
+let liveStream = null;
+let liveWs = null;
+let liveRunning = false;
+let liveFrameCount = 0;
+let liveFpsWindowStart = 0;
+
+function wsURL(path) {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${location.host}${path}`;
+}
+
+function drawLiveFrame(result) {
+  const ctx = liveCanvas.getContext("2d");
+  liveCanvas.width = liveVideo.videoWidth;
+  liveCanvas.height = liveVideo.videoHeight;
+  ctx.drawImage(liveVideo, 0, 0, liveCanvas.width, liveCanvas.height);
+
+  if (!result.cat_detected) {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, 0, liveCanvas.width, 34);
+    ctx.fillStyle = "#fff";
+    ctx.font = "18px sans-serif";
+    ctx.fillText("no cat detected", 10, 23);
+    liveBars.innerHTML = "";
+    return;
+  }
+
+  const colors = { left_ear: "#FF5A32", right_ear: "#3298FF", face: "#3ECF6E" };
+  ctx.lineWidth = Math.max(2, liveCanvas.width * 0.004);
+  ctx.font = "14px sans-serif";
+  Object.entries(result.boxes).forEach(([name, b]) => {
+    const color = colors[name] || "#FF5A32";
+    ctx.strokeStyle = color;
+    ctx.strokeRect(b.x_min, b.y_min, b.x_max - b.x_min, b.y_max - b.y_min);
+  });
+  ctx.fillStyle = "rgba(255,90,50,0.9)";
+  result.keypoints.forEach((kp) => {
+    ctx.beginPath();
+    ctx.arc(kp.x, kp.y, 4, 0, 2 * Math.PI);
+    ctx.fill();
+  });
+  renderBarsInto(liveBars, result.predictions);
+}
+
+function renderBarsInto(container, predictions) {
+  container.innerHTML = "";
+  const sorted = classes.slice().sort((a, b) => predictions[b] - predictions[a]);
+  sorted.forEach((cls) => {
+    const pct = (predictions[cls] * 100).toFixed(1);
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-label"><span>${cls}</span><span>${pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+async function sendFrameLoop() {
+  if (!liveRunning || !liveWs || liveWs.readyState !== WebSocket.OPEN) return;
+  const off = document.createElement("canvas");
+  off.width = liveVideo.videoWidth;
+  off.height = liveVideo.videoHeight;
+  off.getContext("2d").drawImage(liveVideo, 0, 0);
+  off.toBlob(
+    (blob) => {
+      if (!blob || !liveRunning || liveWs.readyState !== WebSocket.OPEN) return;
+      blob.arrayBuffer().then((buf) => {
+        if (liveRunning && liveWs.readyState === WebSocket.OPEN) liveWs.send(buf);
+      });
+    },
+    "image/jpeg",
+    0.8
+  );
+}
+
+async function startLive() {
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+  } catch (e) {
+    liveStatus.textContent = "Camera access denied or unavailable: " + (e.message || e);
+    liveStatus.className = "status error";
+    return;
+  }
+  liveVideo.srcObject = liveStream;
+  await liveVideo.play();
+  livePanel.style.display = "block";
+
+  liveWs = new WebSocket(wsURL("/ws/live"));
+  liveWs.binaryType = "arraybuffer";
+  liveFrameCount = 0;
+  liveFpsWindowStart = performance.now();
+
+  liveWs.onopen = () => {
+    liveRunning = true;
+    liveBtn.textContent = "Stop Live Camera";
+    liveStatus.textContent = "Connected. Streaming…";
+    liveStatus.className = "status";
+    sendFrameLoop();
+  };
+  liveWs.onmessage = (ev) => {
+    const result = JSON.parse(ev.data);
+    drawLiveFrame(result);
+    liveFrameCount++;
+    const elapsed = (performance.now() - liveFpsWindowStart) / 1000;
+    if (elapsed >= 1.0) {
+      const fps = (liveFrameCount / elapsed).toFixed(1);
+      liveStatus.textContent = `Streaming — ${fps} FPS` + (result.cat_detected ? "" : " (no cat detected)");
+      liveFrameCount = 0;
+      liveFpsWindowStart = performance.now();
+    }
+    sendFrameLoop(); // send next frame only after this one's result arrives
+  };
+  liveWs.onerror = () => {
+    liveStatus.textContent = "WebSocket error.";
+    liveStatus.className = "status error";
+  };
+  liveWs.onclose = () => {
+    liveRunning = false;
+  };
+}
+
+function stopLive() {
+  liveRunning = false;
+  if (liveWs) { liveWs.close(); liveWs = null; }
+  if (liveStream) { liveStream.getTracks().forEach((t) => t.stop()); liveStream = null; }
+  livePanel.style.display = "none";
+  liveBtn.textContent = "Start Live Camera";
+  liveStatus.textContent = "";
+}
+
+liveBtn.addEventListener("click", () => {
+  if (liveRunning) stopLive();
+  else startLive();
 });
 
 // Real metrics from reports/metrics.json via the API — never hardcoded.
