@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from src.config import load_config, resolve_path  # noqa: E402
 from src.explainability.gradcam import GradCAM, overlay_cam_on_image  # noqa: E402
 from src.features.geometric import FEATURE_NAMES, compute_geometric_features  # noqa: E402
+from src.keypoints.bbox import compute_boxes  # noqa: E402
 from src.keypoints.infer import KeypointPredictor  # noqa: E402
 from src.mood_cnn.dataset import IMAGENET_MEAN, IMAGENET_STD  # noqa: E402
 from src.mood_cnn.model import MoodCNN  # noqa: E402
@@ -91,6 +92,7 @@ async def predict(file: UploadFile = File(...)):
 
     kp, kp_conf = _state["keypoint_predictor"].predict(img_rgb)
     geo_features = compute_geometric_features(kp)
+    boxes = compute_boxes(kp, kp_conf, image_shape=img_rgb.shape)
 
     resized = cv2.resize(img_rgb, (_state["mood_input_size"], _state["mood_input_size"]))
     tensor = torch.from_numpy(resized.transpose(2, 0, 1)).float() / 255.0
@@ -108,6 +110,7 @@ async def predict(file: UploadFile = File(...)):
             {"x": float(x), "y": float(y), "confidence": float(c)}
             for (x, y), c in zip(kp, kp_conf)
         ],
+        "boxes": boxes,
         "geometric_features": {name: float(v) for name, v in zip(FEATURE_NAMES, geo_features)},
     }
 

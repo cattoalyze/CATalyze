@@ -194,6 +194,7 @@
         <img id="gradcamImg" class="gradcam-img" style="display:none" />
         <div class="toggle-row">
           <button class="toggle-btn active" id="btnKeypoints">Keypoints</button>
+          <button class="toggle-btn" id="btnBoxes">Boxes</button>
           <button class="toggle-btn" id="btnGradcam">Grad-CAM</button>
         </div>
       </div>
@@ -214,10 +215,12 @@ const resultSection = document.getElementById("resultSection");
 const canvas = document.getElementById("keypointCanvas");
 const gradcamImg = document.getElementById("gradcamImg");
 const btnKeypoints = document.getElementById("btnKeypoints");
+const btnBoxes = document.getElementById("btnBoxes");
 const btnGradcam = document.getElementById("btnGradcam");
 
 let currentFile = null;
 let currentImageURL = null;
+let currentPredictData = null;
 
 function setStatus(msg, isError) {
   statusEl.textContent = msg || "";
@@ -267,6 +270,33 @@ function drawKeypoints(imageURL, keypoints) {
   img.src = imageURL;
 }
 
+function drawBoxes(imageURL, boxes) {
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    ctx.lineWidth = Math.max(2, img.width * 0.004);
+    ctx.font = Math.max(12, img.width * 0.022) + "px sans-serif";
+    ctx.textBaseline = "bottom";
+    const colors = { left_ear: "#FF5A32", right_ear: "#3298FF", face: "#3ECF6E" };
+    Object.entries(boxes).forEach(([name, b]) => {
+      const color = colors[name] || "#FF5A32";
+      ctx.strokeStyle = color;
+      ctx.strokeRect(b.x_min, b.y_min, b.x_max - b.x_min, b.y_max - b.y_min);
+      const label = `${name} ${(b.confidence * 100).toFixed(0)}%`;
+      const textY = Math.max(b.y_min, 14);
+      const metrics = ctx.measureText(label);
+      ctx.fillStyle = color;
+      ctx.fillRect(b.x_min, textY - 14, metrics.width + 8, 16);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(label, b.x_min + 4, textY + 1);
+    });
+  };
+  img.src = imageURL;
+}
+
 function renderBars(predictions) {
   const barsDiv = document.getElementById("bars");
   barsDiv.innerHTML = "";
@@ -283,19 +313,29 @@ function renderBars(predictions) {
   });
 }
 
+function setActiveToggle(btn) {
+  [btnKeypoints, btnBoxes, btnGradcam].forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+}
 function showKeypointsView() {
   canvas.style.display = "block";
   gradcamImg.style.display = "none";
-  btnKeypoints.classList.add("active");
-  btnGradcam.classList.remove("active");
+  setActiveToggle(btnKeypoints);
+  if (currentPredictData) drawKeypoints(currentImageURL, currentPredictData.keypoints);
+}
+function showBoxesView() {
+  canvas.style.display = "block";
+  gradcamImg.style.display = "none";
+  setActiveToggle(btnBoxes);
+  if (currentPredictData) drawBoxes(currentImageURL, currentPredictData.boxes);
 }
 function showGradcamView() {
   canvas.style.display = "none";
   gradcamImg.style.display = "block";
-  btnGradcam.classList.add("active");
-  btnKeypoints.classList.remove("active");
+  setActiveToggle(btnGradcam);
 }
 btnKeypoints.addEventListener("click", showKeypointsView);
+btnBoxes.addEventListener("click", showBoxesView);
 btnGradcam.addEventListener("click", showGradcamView);
 
 analyzeBtn.addEventListener("click", async () => {
@@ -322,7 +362,7 @@ analyzeBtn.addEventListener("click", async () => {
       gradcamData = await gradcamResp.json();
     }
 
-    drawKeypoints(currentImageURL, predictData.keypoints);
+    currentPredictData = predictData;
     renderBars(predictData.predictions);
     if (gradcamData) {
       gradcamImg.src = "data:image/png;base64," + gradcamData.overlay_png_base64;
