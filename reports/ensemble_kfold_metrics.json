@@ -1,0 +1,220 @@
+{
+  "n_splits": 5,
+  "note": "Every one of the 226 ANXIOUS examples in geometric_features.csv is tested exactly once across these folds (pooled_per_class support), vs. only 45 in the single 80/20 split reports/ensemble_metrics.json reports. Compare the per-fold spread below to that single number to see how much it was noise.",
+  "calibrated_accuracy_mean": 0.9245108135942328,
+  "calibrated_accuracy_std": 0.004781951294024273,
+  "raw_accuracy_mean": 0.9248197734294541,
+  "raw_accuracy_std": 0.004536089710719918,
+  "anxious_f1_mean": 0.7188740856844306,
+  "anxious_f1_std": 0.047413354114798675,
+  "anxious_f1_per_fold": [
+    0.8045977011494253,
+    0.6666666666666666,
+    0.7272727272727273,
+    0.6875,
+    0.7083333333333334
+  ],
+  "pooled_per_class_calibrated": {
+    "ALERT": {
+      "precision": 0.9401772525849336,
+      "recall": 0.9438368860055607,
+      "f1": 0.9420035149384886,
+      "support": 5395
+    },
+    "ANXIOUS": {
+      "precision": 0.6958333333333333,
+      "recall": 0.7389380530973452,
+      "f1": 0.7167381974248928,
+      "support": 226
+    },
+    "PLAYFUL": {
+      "precision": 0.7275985663082437,
+      "recall": 0.79296875,
+      "f1": 0.7588785046728972,
+      "support": 256
+    },
+    "RELAXED": {
+      "precision": 0.9311258278145695,
+      "recall": 0.9170362640229586,
+      "f1": 0.9240273396424816,
+      "support": 3833
+    }
+  },
+  "fold_results": [
+    {
+      "fold": 0,
+      "n_train": 7768,
+      "n_test": 1942,
+      "raw_accuracy": 0.931513903192585,
+      "calibrated_accuracy": 0.931513903192585,
+      "raw_brier_score": 0.1923078146561197,
+      "calibrated_brier_score": 0.09885755181405581,
+      "per_class_calibrated": {
+        "ALERT": {
+          "precision": 0.9478584729981379,
+          "recall": 0.943466172381835,
+          "f1": 0.9456572224802601,
+          "support": 1079
+        },
+        "ANXIOUS": {
+          "precision": 0.8333333333333334,
+          "recall": 0.7777777777777778,
+          "f1": 0.8045977011494253,
+          "support": 45
+        },
+        "PLAYFUL": {
+          "precision": 0.7735849056603774,
+          "recall": 0.7884615384615384,
+          "f1": 0.780952380952381,
+          "support": 52
+        },
+        "RELAXED": {
+          "precision": 0.92496765847348,
+          "recall": 0.933420365535248,
+          "f1": 0.9291747888239116,
+          "support": 766
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "n_train": 7768,
+      "n_test": 1942,
+      "raw_accuracy": 0.927394438722966,
+      "calibrated_accuracy": 0.9268795056642637,
+      "raw_brier_score": 0.19761930263560945,
+      "calibrated_brier_score": 0.10755710196222432,
+      "per_class_calibrated": {
+        "ALERT": {
+          "precision": 0.9394495412844037,
+          "recall": 0.9490268767377201,
+          "f1": 0.9442139234670355,
+          "support": 1079
+        },
+        "ANXIOUS": {
+          "precision": 0.6226415094339622,
+          "recall": 0.717391304347826,
+          "f1": 0.6666666666666666,
+          "support": 46
+        },
+        "PLAYFUL": {
+          "precision": 0.7735849056603774,
+          "recall": 0.803921568627451,
+          "f1": 0.7884615384615384,
+          "support": 51
+        },
+        "RELAXED": {
+          "precision": 0.9410187667560321,
+          "recall": 0.9164490861618799,
+          "f1": 0.9285714285714286,
+          "support": 766
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "n_train": 7768,
+      "n_test": 1942,
+      "raw_accuracy": 0.9222451081359423,
+      "calibrated_accuracy": 0.9196704428424305,
+      "raw_brier_score": 0.19741173924859942,
+      "calibrated_brier_score": 0.11675347026941142,
+      "per_class_calibrated": {
+        "ALERT": {
+          "precision": 0.9413953488372093,
+          "recall": 0.93790546802595,
+          "f1": 0.9396471680594243,
+          "support": 1079
+        },
+        "ANXIOUS": {
+          "precision": 0.7441860465116279,
+          "recall": 0.7111111111111111,
+          "f1": 0.7272727272727273,
+          "support": 45
+        },
+        "PLAYFUL": {
+          "precision": 0.6666666666666666,
+          "recall": 0.7843137254901961,
+          "f1": 0.7207207207207207,
+          "support": 51
+        },
+        "RELAXED": {
+          "precision": 0.918848167539267,
+          "recall": 0.9152542372881356,
+          "f1": 0.9170476812540823,
+          "support": 767
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "n_train": 7768,
+      "n_test": 1942,
+      "raw_accuracy": 0.9248197734294542,
+      "calibrated_accuracy": 0.925849639546859,
+      "raw_brier_score": 0.19530257162598696,
+      "calibrated_brier_score": 0.1130417515993191,
+      "per_class_calibrated": {
+        "ALERT": {
+          "precision": 0.9320036264732547,
+          "recall": 0.9527340129749768,
+          "f1": 0.9422548120989918,
+          "support": 1079
+        },
+        "ANXIOUS": {
+          "precision": 0.6470588235294118,
+          "recall": 0.7333333333333333,
+          "f1": 0.6875,
+          "support": 45
+        },
+        "PLAYFUL": {
+          "precision": 0.7547169811320755,
+          "recall": 0.7843137254901961,
+          "f1": 0.7692307692307693,
+          "support": 51
+        },
+        "RELAXED": {
+          "precision": 0.9482993197278912,
+          "recall": 0.9087353324641461,
+          "f1": 0.9280958721704394,
+          "support": 767
+        }
+      }
+    },
+    {
+      "fold": 4,
+      "n_train": 7768,
+      "n_test": 1942,
+      "raw_accuracy": 0.9181256436663234,
+      "calibrated_accuracy": 0.9186405767250257,
+      "raw_brier_score": 0.20422216881841412,
+      "calibrated_brier_score": 0.12074340277818348,
+      "per_class_calibrated": {
+        "ALERT": {
+          "precision": 0.9404096834264432,
+          "recall": 0.9360518999073216,
+          "f1": 0.9382257315373896,
+          "support": 1079
+        },
+        "ANXIOUS": {
+          "precision": 0.6666666666666666,
+          "recall": 0.7555555555555555,
+          "f1": 0.7083333333333334,
+          "support": 45
+        },
+        "PLAYFUL": {
+          "precision": 0.6833333333333333,
+          "recall": 0.803921568627451,
+          "f1": 0.7387387387387387,
+          "support": 51
+        },
+        "RELAXED": {
+          "precision": 0.9233817701453104,
+          "recall": 0.9113428943937418,
+          "f1": 0.9173228346456693,
+          "support": 767
+        }
+      }
+    }
+  ]
+}
