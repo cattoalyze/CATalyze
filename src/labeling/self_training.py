@@ -25,8 +25,10 @@ from src.mood_cnn.train import train_mood_cnn  # noqa: E402
 
 
 @torch.no_grad()
-def pseudo_label_pool(model, pool_paths: list[Path], class_names: list[str], input_size: int, thresholds: dict, device, batch_size: int = 64) -> pd.DataFrame:
+def pseudo_label_pool(model, pool_paths: list[Path], class_names: list[str], input_size: int, thresholds: dict, device, batch_size: int = 16) -> pd.DataFrame:
     model.eval()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     normalize = transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
     rows = []
     for start in tqdm(range(0, len(pool_paths), batch_size), desc="pseudo-labeling pool"):
@@ -34,14 +36,17 @@ def pseudo_label_pool(model, pool_paths: list[Path], class_names: list[str], inp
         tensors = []
         valid_paths = []
         for img_path in batch_paths:
-            img = cv2.imread(str(img_path))
-            if img is None:
+            try:
+                img = cv2.imread(str(img_path))
+                if img is None:
+                    continue
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img = cv2.resize(img, (input_size, input_size))
+                t = torch.from_numpy(img.transpose(2, 0, 1)).float() / 255.0
+                tensors.append(normalize(t))
+                valid_paths.append(img_path)
+            except Exception:
                 continue
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = cv2.resize(img, (input_size, input_size))
-            t = torch.from_numpy(img.transpose(2, 0, 1)).float() / 255.0
-            tensors.append(normalize(t))
-            valid_paths.append(img_path)
         if not tensors:
             continue
         batch = torch.stack(tensors).to(device)
@@ -63,6 +68,8 @@ def main():
     np.random.seed(cfg["seed"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     print(f"device: {device}")
 
     labels_path = resolve_path(cfg["paths"]["mood_labels_csv"])

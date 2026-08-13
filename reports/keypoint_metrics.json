@@ -1,8 +1,7 @@
 {
-  "best_val_nme": 0.2453,
-  "test_nme": 0.2301,
+  "best_val_nme": 0.24667916776791593,
+  "test_nme": 0.226732138339712,
   "n_train": 6330,
   "n_val": 1357,
-  "n_test": 1357,
-  "note": "NME normalized by inter-ocular (eye-to-eye) distance. Early stopped at epoch 19 (patience 6)."
+  "n_test": 1357
 }
