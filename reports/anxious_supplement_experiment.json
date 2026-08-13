@@ -1,0 +1,28 @@
+{
+  "description": "Result of attempting to supplement the scarce ANXIOUS class with an external dataset (data/download_anxious_supplement.py), Section 3 item 3 of the continuation prompt. Kept as a permanent record even though the outcome was negative-to-mixed and the data was NOT adopted into the deployed ensemble (artifacts/ensemble_model.joblib, reports/ensemble_metrics.json, reports/ensemble_kfold_metrics.json all reflect the pre-supplement 226-example ANXIOUS class).",
+  "source": {
+    "kaggle_dataset": "nguyenvunhuhuynh/cat-emotion-2",
+    "original_roboflow_project": "roboflow.com/nidowarddarren/cat-emotion-classification-j1v9r",
+    "license": "Public Domain",
+    "source_class": "Distressed",
+    "mapped_to": "ANXIOUS",
+    "note": "Semantic judgment call, not an identical label. Community/uploader-assigned, not independently verified."
+  },
+  "integration_pipeline": {
+    "unique_source_images_after_deduping_3x_roboflow_augmentation": 138,
+    "kept_after_own_keypoint_model_confidence_floor_0.30": 47,
+    "dropped_low_keypoint_confidence": 91,
+    "anxious_class_size_before": 226,
+    "anxious_class_size_after": 273
+  },
+  "measured_result": {
+    "single_split_before": {"anxious_precision": 0.61, "anxious_recall": 0.67, "anxious_f1": 0.64, "n_test": 45},
+    "single_split_after": {"anxious_precision": 0.60, "anxious_recall": 0.53, "anxious_f1": 0.56, "n_test": 55},
+    "single_split_after_external_subset_only": {"accuracy": 0.0, "n_test": 12,
+      "note": "All 12 external-sourced examples in this one test split were misclassified. n=12 is small -- not conclusive alone -- but consistent with the k-fold recall drop below, not contradicted by it."},
+    "kfold_5_pooled_before": {"anxious_precision": 0.6958, "anxious_recall": 0.7389, "anxious_f1": 0.7167, "n": 226},
+    "kfold_5_pooled_after": {"anxious_precision": 0.7448, "anxious_recall": 0.6520, "anxious_f1": 0.6953, "n": 273}
+  },
+  "interpretation": "Overall accuracy and Brier score were essentially unchanged (noise-level). ANXIOUS F1 was flat-to-slightly-down (0.7167 -> 0.6953 pooled k-fold), driven by a real recall drop (0.7389 -> 0.6520) partly offset by a precision gain. Plausible explanation: a real distribution shift between CAT_DATASET's photography style/labeling process and this external source's (different cameras, different framing, community-assigned labels vs this project's own AI-reviewed seed labels) -- not simply noise, though at only 47 added examples the two explanations aren't cleanly separable from each other.",
+  "decision": "Not adopted into the default/deployed ensemble -- same pattern this project already uses for the ONNX INT8 finding (measure honestly, document, don't ship what measurably underperforms). The integration script (data/download_anxious_supplement.py) and the 47 filtered images (data/raw/external/kaggle_distressed/, gitignored like all raw data) are kept for reuse if a larger, more carefully vetted source becomes available -- reverting the code that produced a real, legitimate, honestly-filtered dataset just because it didn't move one metric in the hoped direction would be exactly the file-drawer bias this project avoids elsewhere; not deploying a measured regression is a separate, orthogonal decision from that."
+}

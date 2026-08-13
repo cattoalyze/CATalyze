@@ -4,6 +4,7 @@
   "raw_brier_score": 0.20560702624173238,
   "calibrated_brier_score": 0.12307307870043821,
   "seed_labeled_only_calibrated_accuracy": 0.8461538461538461,
+  "external_kaggle_distressed_only_calibrated_accuracy": null,
   "class_names": [
     "ALERT",
     "ANXIOUS",
@@ -76,5 +77,6 @@
     }
   },
   "n_test": 1942,
-  "n_test_seed_labeled": 78
+  "n_test_seed_labeled": 78,
+  "n_test_external_kaggle_distressed": 0
 }

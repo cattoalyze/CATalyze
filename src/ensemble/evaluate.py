@@ -94,12 +94,22 @@ def evaluate_and_report(X_test, y_test, df_test, raw_pipeline, calibrated, class
     print(sk_classes)
     print(cm)
 
-    # Honest reporting: accuracy on non-pseudo (seed-labeled) test rows only.
-    seed_mask = (df_test["provenance"] != "pseudo").values
+    # Honest reporting: accuracy on the original human/AI-reviewed seed
+    # labels only (provenance == "ai"), *not* just "!= pseudo" — that
+    # would silently also sweep in any other non-pseudo provenance (e.g.
+    # external_kaggle_distressed) added later, changing what this number
+    # means without anyone noticing.
+    seed_mask = (df_test["provenance"] == "ai").values
     seed_only_acc = None
     if seed_mask.sum() > 0:
         seed_only_acc = accuracy_score(y_test_idx[seed_mask], cal_preds_idx[seed_mask])
-        print(f"\nseed-labeled-only (non-pseudo) calibrated test_acc={seed_only_acc:.4f} (n={seed_mask.sum()})")
+        print(f"\nseed-labeled-only (provenance=ai) calibrated test_acc={seed_only_acc:.4f} (n={seed_mask.sum()})")
+
+    external_mask = (df_test["provenance"] == "external_kaggle_distressed").values
+    external_acc = None
+    if external_mask.sum() > 0:
+        external_acc = accuracy_score(y_test_idx[external_mask], cal_preds_idx[external_mask])
+        print(f"external_kaggle_distressed-only calibrated test_acc={external_acc:.4f} (n={external_mask.sum()})")
 
     raw_conf = raw_probs.max(axis=1)
     raw_correct = (raw_preds_idx == y_test_idx).astype(int)
@@ -113,11 +123,13 @@ def evaluate_and_report(X_test, y_test, df_test, raw_pipeline, calibrated, class
         "raw_brier_score": raw_brier,
         "calibrated_brier_score": cal_brier,
         "seed_labeled_only_calibrated_accuracy": seed_only_acc,
+        "external_kaggle_distressed_only_calibrated_accuracy": external_acc,
         "class_names": sk_classes,
         "confusion_matrix": cm.tolist(),
         "classification_report": report_full,
         "n_test": len(y_test_idx),
         "n_test_seed_labeled": int(seed_mask.sum()),
+        "n_test_external_kaggle_distressed": int(external_mask.sum()),
     }
     return metrics
 

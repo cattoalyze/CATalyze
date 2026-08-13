@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-13T11:30:49.951495+00:00",
+  "generated_at": "2026-08-13T12:28:02.106496+00:00",
   "keypoints": {
     "best_val_nme": 0.24667916776791593,
     "test_nme": 0.226732138339712,
@@ -24,6 +24,7 @@
     "raw_brier_score": 0.20560702624173238,
     "calibrated_brier_score": 0.12307307870043821,
     "seed_labeled_only_calibrated_accuracy": 0.8461538461538461,
+    "external_kaggle_distressed_only_calibrated_accuracy": null,
     "class_names": [
       "ALERT",
       "ANXIOUS",
@@ -96,6 +97,7 @@
       }
     },
     "n_test": 1942,
-    "n_test_seed_labeled": 78
+    "n_test_seed_labeled": 78,
+    "n_test_external_kaggle_distressed": 0
   }
 }

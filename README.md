@@ -52,12 +52,43 @@ and dropped — see `src/keypoints/dataset.py`.
 labeled across the 4 mood classes, then self-training/pseudo-labeling was
 attempted on the remaining pool.
 
-**Second dataset for ANXIOUS-class scarcity:** a suitable candidate was found
-(a 671-image, CC-BY-4.0 "Cat Emotions" set on Roboflow with an explicit
-"Scared" class), but downloading it requires a Roboflow API key, which
-would have meant creating an account on the user's behalf — out of scope for
-an autonomous session. Not used; documented here as a known gap rather than
-silently worked around.
+**Second dataset for ANXIOUS-class scarcity:** the Roboflow "Cat Emotions"
+candidate from the original session, and a fresh search this session, both
+turned up only account-gated sources (Roboflow, Kaggle) — no dataset
+downloadable without creating an account on the user's behalf. The user
+then supplied a Kaggle API token directly, which unblocked
+`nguyenvunhuhuynh/cat-emotion-2` (`data/download_anxious_supplement.py`):
+a Kaggle-hosted mirror of a Roboflow export, Public Domain license, whose
+"Distressed" class (138 unique source images after de-duplicating
+Roboflow's 3x augmentation) was mapped to ANXIOUS — a semantic judgment
+call, not an identical label, and community/uploader-assigned rather than
+independently verified (tracked under its own
+`provenance=external_kaggle_distressed` rather than merged into `ai` or
+`pseudo`). Only 47/138 survived this project's own keypoint model at a
+0.30 mean-confidence floor — most candidates are close-up or artistic
+shots the keypoint model (trained on CAT_DATASET's front-facing photos)
+can't reliably localize, so a low-confidence result is expected, not a
+bug.
+
+**Result: not adopted.** ANXIOUS grew 226 → 273 (+21%) with the supplement
+integrated, but stratified 5-fold CV before vs. after
+(`reports/anxious_supplement_experiment.json`) shows pooled ANXIOUS F1
+flat-to-down (0.717 → 0.695), driven by a real recall drop (0.739 → 0.652)
+partly offset by a precision gain — and on the single held-out split, all
+12 external-sourced test examples were misclassified (n=12, not
+conclusive alone, but consistent with the k-fold recall drop). Plausible
+cause: a real distribution shift between CAT_DATASET's photography
+style/labeling process and this external source's, not just noise.
+
+Same pattern this project already uses for the ONNX INT8 finding: measure
+honestly, document it, don't ship a measured regression. The deployed
+ensemble (`artifacts/ensemble_model.joblib`, `reports/ensemble_metrics.json`,
+`reports/ensemble_kfold_metrics.json`) was reverted to the pre-supplement
+226-example ANXIOUS class. `data/download_anxious_supplement.py` and the
+47 filtered images are kept for reuse if a larger, more carefully vetted
+source turns up later — reverting the *code* because this particular
+attempt didn't help would be the file-drawer bias this project avoids
+elsewhere; not deploying a measured regression is a separate decision.
 
 ## Running the pipeline
 
@@ -67,8 +98,11 @@ uv run python -m src.keypoints.train                  # trains keypoint model
 uv run python -m src.labeling.build_label_grids       # builds review grids for seed labeling
 uv run python -m src.labeling.consolidate_seed_labels # (after labeling) -> mood_labels.csv
 uv run python -m src.labeling.self_training           # pseudo-labels the rest
+uv run python -m src.labeling.active_learning           # ranks the remaining unlabeled pool by predictive entropy for human review
 uv run python -m src.features.extract_features        # geometric features for all labeled images
+uv run python -m data.download_anxious_supplement       # optional: requires a Kaggle API token; see "Datasets" — not adopted by default, see reports/anxious_supplement_experiment.json
 uv run python -m src.ensemble.evaluate                # trains + evaluates the ensemble
+uv run python -m src.ensemble.cross_validate            # stratified 5-fold CV, esp. for the scarce ANXIOUS class
 uv run python -m src.reports.generate_metrics          # consolidates reports/metrics.json
 uv run python -m src.explainability.verify_gradcam     # Grad-CAM verification grid
 uv run python -m src.optimization.export_onnx          # ONNX export + INT8 quantization
@@ -87,9 +121,16 @@ contract — verified end-to-end against a real image:
 {
   "predictions": {"ALERT": 0.0004, "ANXIOUS": 0.002, "PLAYFUL": 0.002, "RELAXED": 0.996},
   "keypoints": [{"x": 177.5, "y": 165.2, "confidence": 0.72}, ...],
+  "boxes": {"left_ear": {"x_min": ..., "y_min": ..., "x_max": ..., "y_max": ..., "confidence": 0.75}, "right_ear": {...}, "face": {...}},
   "geometric_features": {"left_ear_angle": -0.59, ...}
 }
 ```
+
+`boxes` are derived algorithmically from the keypoints (min/max rectangle
+of each box's constituent keypoints, padded 15%) — no separate detector.
+Each box's `confidence` is the real mean of its constituent keypoints'
+actual heatmap-peak confidences, never invented. See
+`src/keypoints/bbox.py`.
 
 `POST /gradcam` (same multipart contract) returns a base64-encoded PNG
 overlay plus the mood CNN's own (uncalibrated) raw view of the image.
@@ -99,8 +140,32 @@ overlay plus the mood CNN's own (uncalibrated) raw view of the image.
 `serving.max_upload_mb` (config.yaml, default 10MB) are rejected with 400 —
 both verified with real curl requests, not assumed from the code.
 
+`WS /ws/live` streams live-camera tracking: client sends one JPEG-encoded
+frame per binary message, server replies with one JSON prediction per
+frame (same shape as `/predict`, plus `cat_detected` and EMA-smoothed
+values, or just `{"cat_detected": false, ...}` when no cat is in frame).
+Uses the raw (uncalibrated) ensemble for speed — see
+`src/serving/live_tracker.py` and `reports/live_backend_benchmark.json`
+for why, and measured real-hardware FPS (~12.5-14 FPS on CPU, this
+session's dev machine; no GPU could be benchmarked here — see "Deviations
+from the brief").
+
 ## Deviations from the brief
 
+- **Live-camera path runs on CPU, not GPU, in this session's environment.**
+  This dev machine has an NVIDIA GPU, but the ~3GB of CUDA 12.4 runtime
+  wheels (`torch==2.6.0+cu124`) couldn't be reliably downloaded over this
+  sandbox's network (repeated stalls/timeouts on large files, confirmed by
+  direct `curl` tests, not just pip retries) — worked around with a
+  CPU-only PyTorch install for this session only.
+  `requirements.txt` still pins the CUDA build, correct for a machine that
+  can reach it; this was a session-local workaround, not a project change.
+  The live-camera backend choice (raw ensemble over calibrated, PyTorch
+  over ONNX/INT8) was decided by real CPU measurement — see
+  `reports/live_backend_benchmark.json` — and should be re-benchmarked on
+  GPU by whoever next runs this with working CUDA access, since the
+  raw-vs-calibrated tradeoff in particular could look different once the
+  neural-net latency stops dominating.
 - **PyTorch instead of TensorFlow/Keras.** Architecture is unchanged
   (MobileNetV2 backbone, heatmap decoder, `GlobalAveragePooling2D`-equivalent
   embedding via `nn.AdaptiveAvgPool2d`), only the framework differs, because
