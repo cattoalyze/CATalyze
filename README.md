@@ -8,10 +8,6 @@ feature engineering → MobileNetV2 mood classifier (whose pooled features
 double as an embedding) → Random Forest ensemble over geometric features +
 CNN embedding, calibrated with `CalibratedClassifierCV`.
 
-See [`MODEL_CARD.md`](MODEL_CARD.md) for intended use, training data
-provenance, and the full quantitative breakdown in standard model-card
-format.
-
 ## Problem statement
 
 Cat body language is a real, documented signal of mood and welfare, but it
