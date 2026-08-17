@@ -12,39 +12,76 @@ See [`MODEL_CARD.md`](MODEL_CARD.md) for intended use, training data
 provenance, and the full quantitative breakdown in standard model-card
 format.
 
-## Environment
+## Problem statement
 
-- Python 3.11, managed via `uv`
-- PyTorch (not TensorFlow — native Windows has no TF GPU support since 2.11;
-  `tensorflow[and-cuda]` is Linux-only. See "Deviations from the brief" below.)
+Cat body language is a real, documented signal of mood and welfare, but it
+isn't something most owners can reliably read at a glance from a single
+photo — and no off-the-shelf, labeled "cat mood" dataset exists to train a
+classifier against. The closest available real dataset (CAT_DATASET, a.k.a.
+the "Crawford Cat Dataset") has 9-point facial keypoints, not mood labels,
+so a usable mood-labeled dataset has to be built on top of it from scratch.
 
-```bash
-uv venv .venv --python 3.11
-uv pip install -r requirements.txt
-```
+The class that matters most for welfare — ANXIOUS — is also the scarcest in
+casual pet photos, so a system built without accounting for that scarcity
+risks scoring well in aggregate while quietly failing on the one class it
+most needs to get right. Self-training on top of a scarce-label problem
+compounds this: pseudo-labeling naturally reinforces whatever the model
+already finds easy, which can erase a hard/rare class's already-thin signal
+rather than filling it in.
 
-## Repository structure
+Finally, raw classifier softmax output is not the same thing as a
+trustworthy confidence — an uncalibrated model can be systematically over-
+or under-confident, which matters the moment a prediction is shown to a
+person as a percentage. CATalyze exists to solve these problems together:
+build a real mood-labeled dataset where none exists, guard against
+self-training quietly amplifying majority classes, produce confidence
+scores that are genuinely calibrated and verified (not just softmax numbers
+presented as probabilities), and report all of it honestly — including
+everywhere it doesn't fully work.
 
-```
-catalyze/
-├── config/config.yaml          # all hyperparameters, paths, thresholds
-├── data/download.py            # CAT_DATASET acquisition (archive.org mirror)
-├── src/
-│   ├── keypoints/               # heatmap-based ear/face keypoint model
-│   ├── features/                # geometric feature engineering
-│   ├── mood_cnn/                 # MobileNetV2 mood classifier
-│   ├── labeling/                 # seed labeling UI + self-training
-│   ├── ensemble/                 # RF + CalibratedClassifierCV
-│   ├── serving/                  # FastAPI /predict, /gradcam, /metrics
-│   ├── explainability/            # Grad-CAM
-│   └── optimization/              # ONNX export + INT8 quantization + benchmark
-├── frontend/                    # static demo page (served by the API)
-├── tests/
-├── reports/                     # auto-generated metrics + visualizations
-└── requirements.txt
-```
+## Objectives
 
-## Datasets
+1. Build a real, working, modular, end-to-end pipeline — not a simulated
+   demo. Every number in this README comes from a script that was actually
+   executed, never hardcoded or hand-transcribed.
+2. Use more than one real dataset, and actively search for a second one to
+   address ANXIOUS-class scarcity rather than relying solely on synthetic
+   oversampling and calling the class "handled."
+3. Detect 9 facial keypoints via heatmap-based regression (not direct
+   coordinate regression, which has a real precision ceiling), with a
+   genuine per-keypoint confidence score — the heatmap peak value, not an
+   invented number.
+4. Engineer interpretable geometric features (ear angle, spread, symmetry,
+   height, face compactness) from those keypoints.
+5. Train an image-only mood CNN whose pooled features double as a reusable
+   embedding for the ensemble stage.
+6. Combine geometric features and the CNN embedding in an ensemble
+   classifier with genuine, verified probability calibration — report raw
+   vs. calibrated accuracy, per-class precision/recall/F1, a confusion
+   matrix, and a reliability diagram with Brier score, not just a single
+   accuracy figure.
+7. Expose the system through a FastAPI serving contract (`/predict`, plus
+   health-check and input validation) that an external frontend can
+   consume, matching the brief's JSON contract exactly.
+8. Where time and environment permit, implement the brief's legitimate
+   stretch goals for real rather than skipping or faking them: Grad-CAM
+   explainability, ONNX export + INT8 quantization with a measured (not
+   assumed) size/latency/accuracy comparison, a small test suite, and an
+   auto-generated `reports/metrics.json` so no number is ever
+   hand-transcribed.
+9. Document known limitations and any deviation from the original brief
+   explicitly, rather than presenting inflated or cherry-picked numbers.
+
+### Descoped: tail detection (Section 8 stretch)
+
+Not attempted. This is the pre-approved ear-only fallback, chosen for two
+reasons: (1) the brief itself flags MMPose/MMCV + an isolated NumPy<2
+environment as a real, demonstrated dependency-conflict risk not worth
+taking on for a stretch feature, and (2) disk/compute budget was ultimately
+fine (119.8GB free after the core pipeline), so this was a deliberate scope
+call, not a forced one. Ear-only geometric features are used throughout.
+
+## Dataset used
 
 **Primary: CAT_DATASET** (Zhang, Sun & Tang; a.k.a. "Crawford Cat Dataset" on
 Kaggle), 9,992 images with 9-point facial keypoint annotations, downloaded
@@ -94,7 +131,192 @@ source turns up later — reverting the *code* because this particular
 attempt didn't help would be the file-drawer bias this project avoids
 elsewhere; not deploying a measured regression is a separate decision.
 
-## Running the pipeline
+## Technologies/libraries used
+
+Full pinned list in [`requirements.txt`](requirements.txt); the libraries
+that actually shape the system:
+
+- **Language & environment:** Python 3.11, managed via `uv` (`uv venv`,
+  `uv pip install`).
+- **Deep learning:** PyTorch 2.6 + torchvision (`+cu124` build pinned),
+  chosen over TensorFlow/Keras — native-Windows TensorFlow has been
+  CPU-only since v2.11 (see "Deviations from the original brief" below for
+  the full reasoning). MobileNetV2 is the shared backbone for both the
+  keypoint detector and the mood CNN.
+- **Classical ML:** scikit-learn (`RandomForestClassifier`,
+  `CalibratedClassifierCV`) for the ensemble stage; imbalanced-learn
+  (SMOTE) for minority-class oversampling on the geometric feature vectors.
+- **Model optimization:** ONNX, `onnxruntime`, `onnxscript` — export and
+  INT8 dynamic quantization of both trained models, with real measured
+  benchmarks (`src/optimization/`).
+- **Computer vision / imaging:** OpenCV, Pillow, matplotlib (for generated
+  report figures like the reliability diagram and Grad-CAM grids).
+- **Serving:** FastAPI, uvicorn, `websockets` (the `/ws/live` tracker),
+  `python-multipart` (file uploads), Pydantic.
+- **Data & experiment tracking:** pandas, NumPy, joblib (model
+  persistence), and a small dependency-free custom run-logger
+  (`src/reports/experiment_log.py`) instead of MLflow/W&B.
+- **Dataset acquisition:** `requests` + `tqdm` (archive.org download),
+  `kagglehub` (the Kaggle-hosted ANXIOUS supplement dataset).
+- **Testing:** pytest.
+- **Frontend:** vanilla HTML/CSS/JS (`frontend/index.html`) — no framework,
+  no build step, served as a static file by FastAPI itself.
+
+## Methodology
+
+### Repository structure
+
+```
+catalyze/
+├── config/config.yaml          # all hyperparameters, paths, thresholds
+├── data/download.py            # CAT_DATASET acquisition (archive.org mirror)
+├── src/
+│   ├── keypoints/               # heatmap-based ear/face keypoint model
+│   ├── features/                # geometric feature engineering
+│   ├── mood_cnn/                 # MobileNetV2 mood classifier
+│   ├── labeling/                 # seed labeling UI + self-training
+│   ├── ensemble/                 # RF + CalibratedClassifierCV
+│   ├── serving/                  # FastAPI /predict, /gradcam, /metrics
+│   ├── explainability/            # Grad-CAM
+│   └── optimization/              # ONNX export + INT8 quantization + benchmark
+├── frontend/                    # static demo page (served by the API)
+├── tests/
+├── reports/                     # auto-generated metrics + visualizations
+└── requirements.txt
+```
+
+### Serving layer
+
+`POST /predict` (multipart form, field `file`) returns the brief's JSON
+contract — verified end-to-end against a real image:
+
+```json
+{
+  "predictions": {"ALERT": 0.0004, "ANXIOUS": 0.002, "PLAYFUL": 0.002, "RELAXED": 0.996},
+  "keypoints": [{"x": 177.5, "y": 165.2, "confidence": 0.72}, ...],
+  "boxes": {"left_ear": {"x_min": ..., "y_min": ..., "x_max": ..., "y_max": ..., "confidence": 0.75}, "right_ear": {...}, "face": {...}},
+  "geometric_features": {"left_ear_angle": -0.59, ...}
+}
+```
+
+`boxes` are derived algorithmically from the keypoints (min/max rectangle
+of each box's constituent keypoints, padded 15%) — no separate detector.
+Each box's `confidence` is the real mean of its constituent keypoints'
+actual heatmap-peak confidences, never invented. See
+`src/keypoints/bbox.py`.
+
+`POST /gradcam` (same multipart contract) returns a base64-encoded PNG
+overlay plus the mood CNN's own (uncalibrated) raw view of the image.
+`GET /metrics` serves `reports/metrics.json` verbatim.
+
+`GET /health` returns model-load status. Non-image uploads and uploads over
+`serving.max_upload_mb` (config.yaml, default 10MB) are rejected with 400 —
+both verified with real curl requests, not assumed from the code.
+
+`WS /ws/live` streams live-camera tracking: client sends one JPEG-encoded
+frame per binary message, server replies with one JSON prediction per
+frame (same shape as `/predict`, plus `cat_detected` and EMA-smoothed
+values, or just `{"cat_detected": false, ...}` when no cat is in frame).
+Uses the raw (uncalibrated) ensemble for speed — see
+`src/serving/live_tracker.py` and `reports/live_backend_benchmark.json`
+for why, and measured real-hardware FPS (~12.5-14 FPS on CPU, this
+session's dev machine; no GPU could be benchmarked here — see "Deviations
+from the original brief").
+
+### Explainability — Grad-CAM (`src/explainability/gradcam.py`)
+
+Implemented against `MoodCNN.backbone[-1]` (the last conv block, 1280
+channels, the same feature map that gets pooled into the embedding).
+Verified visually on real predictions — 2 correct examples per class plus
+1 misclassification — in `reports/gradcam_verification.png`. All correct
+predictions show the heatmap focused on the cat's face/eyes/ears, not
+background clutter. The misclassified example (true=RELAXED, predicted
+ALERT at 0.97) is genuinely informative: Grad-CAM shows the model fixating
+tightly on the cat's wide, direct-staring eyes — a classic ALERT visual
+cue — which plausibly explains the error even though the ground truth
+(itself AI-assigned, not human-verified) was RELAXED. Exposed live via
+`POST /gradcam` on the serving API, and toggleable in the demo frontend.
+
+### Demo frontend (`frontend/index.html`)
+
+A single static HTML/CSS/JS page (no build step, no framework), served by
+the FastAPI app itself via a static-files mount — `uv run uvicorn
+src.serving.api:app --port 8000` and open `http://localhost:8000/`.
+Pastel orange/white palette (`#FFF8F0` background, `#FFCBA4`/`#F5A76A`
+accent, `#3A3A3A` text). Upload an image (or click one of 4 bundled sample
+images, one per mood class, each verified in advance to produce a
+confident, correct prediction from the real pipeline) and click Analyze:
+
+- Calls the real `/predict` endpoint and renders the 4 calibrated
+  confidence bars from its actual response — not a single deterministic
+  label.
+- Draws the 9 returned keypoints as dots on the uploaded image (canvas).
+- Calls the real `/gradcam` endpoint and offers a toggle between the
+  keypoints view and the Grad-CAM overlay.
+- Footer accuracy figure ("Ensemble seed-labeled-only accuracy: 83.3%") is
+  fetched live from `GET /metrics`, which serves `reports/metrics.json`
+  verbatim — never hardcoded or re-typed.
+
+Verified end-to-end in a real browser session against the real running
+API: sample image → real `/predict` + `/gradcam` calls → confidence bars
+render correctly (matched the independently-verified prediction for that
+image) → keypoints drawn on canvas (confirmed via pixel inspection, not
+just "no JS errors") → Grad-CAM toggle switches views correctly → metrics
+footer populated from the live API response.
+
+**What was deliberately left out**, per the brief: no dark mode, no stats
+dashboard, no training-pipeline panel, no PDF/CSV export, no fabricated or
+re-typed numbers anywhere on the page.
+
+### Deviations from the original brief
+
+- **Live-camera path runs on CPU, not GPU, in this session's environment.**
+  This dev machine has an NVIDIA GPU, but the ~3GB of CUDA 12.4 runtime
+  wheels (`torch==2.6.0+cu124`) couldn't be reliably downloaded over this
+  sandbox's network (repeated stalls/timeouts on large files, confirmed by
+  direct `curl` tests, not just pip retries) — worked around with a
+  CPU-only PyTorch install for this session only.
+  `requirements.txt` still pins the CUDA build, correct for a machine that
+  can reach it; this was a session-local workaround, not a project change.
+  The live-camera backend choice (raw ensemble over calibrated, PyTorch
+  over ONNX/INT8) was decided by real CPU measurement — see
+  `reports/live_backend_benchmark.json` — and should be re-benchmarked on
+  GPU by whoever next runs this with working CUDA access, since the
+  raw-vs-calibrated tradeoff in particular could look different once the
+  neural-net latency stops dominating.
+- **PyTorch instead of TensorFlow/Keras.** Architecture is unchanged
+  (MobileNetV2 backbone, heatmap decoder, `GlobalAveragePooling2D`-equivalent
+  embedding via `nn.AdaptiveAvgPool2d`), only the framework differs, because
+  native-Windows TensorFlow has been CPU-only since v2.11.
+- **Seed mood labels are `provenance='ai'`, not `'human'`.** No human rater
+  was available in this autonomous session. Labels were assigned by Claude
+  visually reviewing batches of real images (see
+  `src/labeling/build_label_grids.py` / `consolidate_seed_labels.py`) — a
+  real judgment call on real images, but a weaker ground truth than true
+  human annotation. `src/labeling/seed_tool.py` is a real, working manual
+  labeling web UI for a human rater to use instead, if higher-quality seed
+  labels are wanted later.
+- **Self-training confidence thresholds were lowered from the brief's
+  initial placeholders** (0.75-0.85 → 0.50-0.60) after measuring that a mood
+  CNN trained on only 336 seed images rarely exceeds ~0.6 max-softmax
+  confidence on unseen images. The original thresholds yielded zero
+  pseudo-labels; this was verified empirically before adjusting, not assumed.
+
+## Steps to execute the project
+
+### Environment setup
+
+- Python 3.11, managed via `uv`
+- PyTorch (not TensorFlow — native Windows has no TF GPU support since 2.11;
+  `tensorflow[and-cuda]` is Linux-only. See "Deviations from the original
+  brief" above.)
+
+```bash
+uv venv .venv --python 3.11
+uv pip install -r requirements.txt
+```
+
+### Running the pipeline
 
 ```bash
 uv run python -m data.download                       # ~2.1GB, archive.org mirror
@@ -104,7 +326,7 @@ uv run python -m src.labeling.consolidate_seed_labels # (after labeling) -> mood
 uv run python -m src.labeling.self_training           # pseudo-labels the rest
 uv run python -m src.labeling.active_learning           # ranks the remaining unlabeled pool by predictive entropy for human review
 uv run python -m src.features.extract_features        # geometric features for all labeled images
-uv run python -m data.download_anxious_supplement       # optional: requires a Kaggle API token; see "Datasets" — not adopted by default, see reports/anxious_supplement_experiment.json
+uv run python -m data.download_anxious_supplement       # optional: requires a Kaggle API token; see "Dataset used" — not adopted by default, see reports/anxious_supplement_experiment.json
 uv run python -m src.ensemble.evaluate                # trains + evaluates the ensemble
 uv run python -m src.ensemble.cross_validate            # stratified 5-fold CV, esp. for the scarce ANXIOUS class
 uv run python -m src.reports.subgroup_analysis          # accuracy by lighting/coat-color proxy, provenance, dataset source
@@ -143,79 +365,14 @@ PID and logs live in `.run/` (gitignored); `tail -f .run/server.log` to
 watch it. These scripts only manage the serving process — they don't
 re-run training/evaluation.
 
-## Serving API
+## Results
 
-`POST /predict` (multipart form, field `file`) returns the brief's JSON
-contract — verified end-to-end against a real image:
-
-```json
-{
-  "predictions": {"ALERT": 0.0004, "ANXIOUS": 0.002, "PLAYFUL": 0.002, "RELAXED": 0.996},
-  "keypoints": [{"x": 177.5, "y": 165.2, "confidence": 0.72}, ...],
-  "boxes": {"left_ear": {"x_min": ..., "y_min": ..., "x_max": ..., "y_max": ..., "confidence": 0.75}, "right_ear": {...}, "face": {...}},
-  "geometric_features": {"left_ear_angle": -0.59, ...}
-}
-```
-
-`boxes` are derived algorithmically from the keypoints (min/max rectangle
-of each box's constituent keypoints, padded 15%) — no separate detector.
-Each box's `confidence` is the real mean of its constituent keypoints'
-actual heatmap-peak confidences, never invented. See
-`src/keypoints/bbox.py`.
-
-`POST /gradcam` (same multipart contract) returns a base64-encoded PNG
-overlay plus the mood CNN's own (uncalibrated) raw view of the image.
-`GET /metrics` serves `reports/metrics.json` verbatim.
-
-`GET /health` returns model-load status. Non-image uploads and uploads over
-`serving.max_upload_mb` (config.yaml, default 10MB) are rejected with 400 —
-both verified with real curl requests, not assumed from the code.
-
-`WS /ws/live` streams live-camera tracking: client sends one JPEG-encoded
-frame per binary message, server replies with one JSON prediction per
-frame (same shape as `/predict`, plus `cat_detected` and EMA-smoothed
-values, or just `{"cat_detected": false, ...}` when no cat is in frame).
-Uses the raw (uncalibrated) ensemble for speed — see
-`src/serving/live_tracker.py` and `reports/live_backend_benchmark.json`
-for why, and measured real-hardware FPS (~12.5-14 FPS on CPU, this
-session's dev machine; no GPU could be benchmarked here — see "Deviations
-from the brief").
-
-## Deviations from the brief
-
-- **Live-camera path runs on CPU, not GPU, in this session's environment.**
-  This dev machine has an NVIDIA GPU, but the ~3GB of CUDA 12.4 runtime
-  wheels (`torch==2.6.0+cu124`) couldn't be reliably downloaded over this
-  sandbox's network (repeated stalls/timeouts on large files, confirmed by
-  direct `curl` tests, not just pip retries) — worked around with a
-  CPU-only PyTorch install for this session only.
-  `requirements.txt` still pins the CUDA build, correct for a machine that
-  can reach it; this was a session-local workaround, not a project change.
-  The live-camera backend choice (raw ensemble over calibrated, PyTorch
-  over ONNX/INT8) was decided by real CPU measurement — see
-  `reports/live_backend_benchmark.json` — and should be re-benchmarked on
-  GPU by whoever next runs this with working CUDA access, since the
-  raw-vs-calibrated tradeoff in particular could look different once the
-  neural-net latency stops dominating.
-- **PyTorch instead of TensorFlow/Keras.** Architecture is unchanged
-  (MobileNetV2 backbone, heatmap decoder, `GlobalAveragePooling2D`-equivalent
-  embedding via `nn.AdaptiveAvgPool2d`), only the framework differs, because
-  native-Windows TensorFlow has been CPU-only since v2.11.
-- **Seed mood labels are `provenance='ai'`, not `'human'`.** No human rater
-  was available in this autonomous session. Labels were assigned by Claude
-  visually reviewing batches of real images (see
-  `src/labeling/build_label_grids.py` / `consolidate_seed_labels.py`) — a
-  real judgment call on real images, but a weaker ground truth than true
-  human annotation. `src/labeling/seed_tool.py` is a real, working manual
-  labeling web UI for a human rater to use instead, if higher-quality seed
-  labels are wanted later.
-- **Self-training confidence thresholds were lowered from the brief's
-  initial placeholders** (0.75-0.85 → 0.50-0.60) after measuring that a mood
-  CNN trained on only 336 seed images rarely exceeds ~0.6 max-softmax
-  confidence on unseen images. The original thresholds yielded zero
-  pseudo-labels; this was verified empirically before adjusting, not assumed.
-
-## Real measured results
+A full interactive visual report — KPI tiles, confusion matrix, per-class
+metrics, calibration curves, fairness breakdown, and latency benchmarks —
+is available at [`reports/scorecard.html`](reports/scorecard.html) (open
+directly in any browser) or [`reports/scorecard.pdf`](reports/scorecard.pdf)
+for a print/share-friendly version. Both are generated from the same
+`reports/*.json` files summarized below.
 
 See `reports/metrics.json` (auto-generated, never hand-transcribed) for the
 authoritative numbers. Summary as of this run:
@@ -302,34 +459,11 @@ real gap is provenance (ai vs. pseudo, 0.846 vs. 0.918) — already known
 and explained above (pseudo accuracy is inflated by self-training
 confirmation bias, not a subgroup fairness issue). `dataset_source` is
 currently 100% `crawford` — the ANXIOUS external-Kaggle supplement was
-evaluated and not adopted (see above), so there are zero external-source
-images in the currently-deployed feature set; this axis is wired up for
-if/when that changes.
+evaluated and not adopted (see "Dataset used" above), so there are zero
+external-source images in the currently-deployed feature set; this axis is
+wired up for if/when that changes.
 
-## Descoped: tail detection (Section 8 stretch)
-
-Not attempted. This is the pre-approved ear-only fallback, chosen for two
-reasons: (1) the brief itself flags MMPose/MMCV + an isolated NumPy<2
-environment as a real, demonstrated dependency-conflict risk not worth
-taking on for a stretch feature, and (2) disk/compute budget was ultimately
-fine (119.8GB free after the core pipeline), so this was a deliberate scope
-call, not a forced one. Ear-only geometric features are used throughout.
-
-## Grad-CAM (`src/explainability/gradcam.py`)
-
-Implemented against `MoodCNN.backbone[-1]` (the last conv block, 1280
-channels, the same feature map that gets pooled into the embedding).
-Verified visually on real predictions — 2 correct examples per class plus
-1 misclassification — in `reports/gradcam_verification.png`. All correct
-predictions show the heatmap focused on the cat's face/eyes/ears, not
-background clutter. The misclassified example (true=RELAXED, predicted
-ALERT at 0.97) is genuinely informative: Grad-CAM shows the model fixating
-tightly on the cat's wide, direct-staring eyes — a classic ALERT visual
-cue — which plausibly explains the error even though the ground truth
-(itself AI-assigned, not human-verified) was RELAXED. Exposed live via
-`POST /gradcam` on the serving API, and toggleable in the demo frontend.
-
-## ONNX export + INT8 quantization (`src/optimization/`)
+### Inference efficiency (ONNX export + INT8 quantization)
 
 Both the mood CNN and the keypoint model were exported to ONNX and
 quantized (`src/optimization/export_onnx.py`), then benchmarked
@@ -370,34 +504,3 @@ internal shape-inference pass, produced a `ShapeInferenceError` on an
 otherwise valid, checker-passing, correctly-running graph — fixed by
 running onnxruntime's own recommended `quant_pre_process` step before
 quantization (documented in `export_onnx.py`).
-
-## Demo frontend (`frontend/index.html`)
-
-A single static HTML/CSS/JS page (no build step, no framework), served by
-the FastAPI app itself via a static-files mount — `uv run uvicorn
-src.serving.api:app --port 8000` and open `http://localhost:8000/`.
-Pastel orange/white palette (`#FFF8F0` background, `#FFCBA4`/`#F5A76A`
-accent, `#3A3A3A` text). Upload an image (or click one of 4 bundled sample
-images, one per mood class, each verified in advance to produce a
-confident, correct prediction from the real pipeline) and click Analyze:
-
-- Calls the real `/predict` endpoint and renders the 4 calibrated
-  confidence bars from its actual response — not a single deterministic
-  label.
-- Draws the 9 returned keypoints as dots on the uploaded image (canvas).
-- Calls the real `/gradcam` endpoint and offers a toggle between the
-  keypoints view and the Grad-CAM overlay.
-- Footer accuracy figure ("Ensemble seed-labeled-only accuracy: 83.3%") is
-  fetched live from `GET /metrics`, which serves `reports/metrics.json`
-  verbatim — never hardcoded or re-typed.
-
-Verified end-to-end in a real browser session against the real running
-API: sample image → real `/predict` + `/gradcam` calls → confidence bars
-render correctly (matched the independently-verified prediction for that
-image) → keypoints drawn on canvas (confirmed via pixel inspection, not
-just "no JS errors") → Grad-CAM toggle switches views correctly → metrics
-footer populated from the live API response.
-
-**What was deliberately left out**, per the brief: no dark mode, no stats
-dashboard, no training-pipeline panel, no PDF/CSV export, no fabricated or
-re-typed numbers anywhere on the page.
