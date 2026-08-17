@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from src.config import load_config, resolve_path  # noqa: E402
 from src.ensemble.evaluate import multiclass_brier_score  # noqa: E402
 from src.ensemble.train import build_feature_matrix, compute_cnn_embeddings  # noqa: E402
+from src.reports.experiment_log import log_run  # noqa: E402
 
 
 def main(n_splits: int = 5):
@@ -165,6 +166,7 @@ def main(n_splits: int = 5):
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"\nSaved {out_path}")
+    log_run("ensemble_kfold", summary)
     return summary
 
 

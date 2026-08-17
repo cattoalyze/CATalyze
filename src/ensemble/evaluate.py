@@ -16,6 +16,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from src.config import load_config, resolve_path  # noqa: E402
+from src.reports.experiment_log import log_run  # noqa: E402
 
 
 def multiclass_brier_score(y_true_idx: np.ndarray, probs: np.ndarray, n_classes: int) -> float:
@@ -149,6 +150,7 @@ def main():
     with open(reports_dir / "ensemble_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2, default=str)
     print(f"\nSaved metrics to {reports_dir / 'ensemble_metrics.json'}")
+    log_run("ensemble", metrics)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from src.config import load_config, resolve_path  # noqa: E402
 from src.keypoints.dataset import CatKeypointsDataset, list_samples, IMAGENET_MEAN, IMAGENET_STD  # noqa: E402
 from src.keypoints.heatmap_utils import decode_heatmaps  # noqa: E402
+from src.reports.experiment_log import log_run  # noqa: E402
 from src.keypoints.model import HeatmapKeypointModel  # noqa: E402
 
 
@@ -161,6 +162,7 @@ def main():
     result = {"best_val_nme": best_val_nme, "test_nme": test_nme, "n_train": len(train), "n_val": len(val), "n_test": len(test)}
     with open(reports_dir / "keypoint_metrics.json", "w") as f:
         json.dump(result, f, indent=2)
+    log_run("keypoints", result)
     return result
 
 

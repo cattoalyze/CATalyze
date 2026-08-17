@@ -1,0 +1,51 @@
+{
+  "description": "Accuracy of the deployed, already-trained ensemble (artifacts/ensemble_model.joblib), sliced by lighting and coat-color proxies plus label provenance and dataset source. Same held-out test split as reports/ensemble_metrics.json (same seed/stratify), not a fresh retrain.",
+  "caveat": "Coat color and lighting are not annotated anywhere in this project's data. 'lighting' below is mean grayscale image brightness and 'coat_color' is mean HSV saturation, both computed directly from pixels and bucketed into terciles of this test set's own distribution -- real, measured pixel statistics, but heuristic proxies, not verified coat-color or lighting-condition labels. Saturation in particular is also affected by camera/background/lighting, not coat color alone.",
+  "n_test": 1942,
+  "n_unreadable_images_excluded": 0,
+  "overall_calibrated_accuracy": 0.9155509783728115,
+  "by_lighting_proxy_brightness_tercile": {
+    "low": {
+      "n": 648,
+      "accuracy": 0.9104938271604939
+    },
+    "mid": {
+      "n": 647,
+      "accuracy": 0.9258114374034003
+    },
+    "high": {
+      "n": 647,
+      "accuracy": 0.910355486862442
+    }
+  },
+  "by_coat_color_proxy_saturation_tercile": {
+    "low": {
+      "n": 648,
+      "accuracy": 0.9120370370370371
+    },
+    "mid": {
+      "n": 647,
+      "accuracy": 0.919629057187017
+    },
+    "high": {
+      "n": 647,
+      "accuracy": 0.9149922720247295
+    }
+  },
+  "by_label_provenance": {
+    "ai": {
+      "n": 78,
+      "accuracy": 0.8461538461538461
+    },
+    "pseudo": {
+      "n": 1864,
+      "accuracy": 0.9184549356223176
+    }
+  },
+  "by_dataset_source": {
+    "crawford": {
+      "n": 1942,
+      "accuracy": 0.9155509783728115
+    }
+  }
+}

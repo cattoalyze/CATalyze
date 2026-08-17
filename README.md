@@ -8,6 +8,10 @@ feature engineering → MobileNetV2 mood classifier (whose pooled features
 double as an embedding) → Random Forest ensemble over geometric features +
 CNN embedding, calibrated with `CalibratedClassifierCV`.
 
+See [`MODEL_CARD.md`](MODEL_CARD.md) for intended use, training data
+provenance, and the full quantitative breakdown in standard model-card
+format.
+
 ## Environment
 
 - Python 3.11, managed via `uv`
@@ -103,6 +107,7 @@ uv run python -m src.features.extract_features        # geometric features for a
 uv run python -m data.download_anxious_supplement       # optional: requires a Kaggle API token; see "Datasets" — not adopted by default, see reports/anxious_supplement_experiment.json
 uv run python -m src.ensemble.evaluate                # trains + evaluates the ensemble
 uv run python -m src.ensemble.cross_validate            # stratified 5-fold CV, esp. for the scarce ANXIOUS class
+uv run python -m src.reports.subgroup_analysis          # accuracy by lighting/coat-color proxy, provenance, dataset source
 uv run python -m src.reports.generate_metrics          # consolidates reports/metrics.json
 uv run python -m src.explainability.verify_gradcam     # Grad-CAM verification grid
 uv run python -m src.optimization.export_onnx          # ONNX export + INT8 quantization
@@ -110,7 +115,33 @@ uv run python -m src.optimization.benchmark            # real size/latency/accur
 uv run uvicorn src.serving.api:app --port 8000         # serve /predict + demo frontend at /
 ```
 
+`reports/*.json` files are each overwritten by their stage's next run, so
+past runs aren't queryable from them alone — only the latest survives.
+`src/keypoints/train.py`, `src/mood_cnn/train.py`,
+`src/ensemble/evaluate.py`, `src/ensemble/cross_validate.py`, and
+`src/reports/subgroup_analysis.py` each also append one JSON line (with a
+timestamp and git commit) to `reports/experiment_log.jsonl` via
+`src/reports/experiment_log.py`'s `log_run()` — a dependency-free
+alternative to MLflow/W&B sized for this project. Run
+`uv run python -m src.reports.experiment_log` to print the logged run
+history.
+
 Run tests with `uv run pytest tests/ -v`.
+
+Once the pipeline has been trained at least once (`artifacts/*` exist),
+`./run.sh` / `./stop.sh` start and stop just the serving API + demo
+frontend (the last line above) as a background process, without needing to
+manage `uvicorn` by hand:
+
+```bash
+./run.sh          # starts on :8000 (PORT=9000 ./run.sh for a different port), backgrounded
+                   # waits for /health before returning; refuses to start twice
+./stop.sh          # stops it (SIGTERM, falls back to SIGKILL after 10s)
+```
+
+PID and logs live in `.run/` (gitignored); `tail -f .run/server.log` to
+watch it. These scripts only manage the serving process — they don't
+re-run training/evaluation.
 
 ## Serving API
 
@@ -245,6 +276,35 @@ curve tracks the ideal diagonal closely.
   accuracy), suggesting the geometric features do carry real signal beyond
   what the CNN already learns from raw pixels — a genuine architectural
   validation, not assumed.
+
+### Subgroup/bias analysis
+
+Neither coat color nor lighting is an annotated field anywhere in this
+project (they were never labeled), so `src/reports/subgroup_analysis.py`
+slices the deployed ensemble's accuracy by two pixel-derived proxies
+instead — mean grayscale brightness (lighting) and mean HSV saturation
+(coat-color/vividness) — bucketed into terciles of the test set's own
+distribution, plus label provenance and dataset source. Real, measured
+pixel statistics, but heuristics, not verified annotations; saturation in
+particular is also affected by camera/background, not coat color alone.
+Full numbers in `reports/subgroup_analysis.json`; summary as of this run:
+
+| Slice | Bucket | n | Accuracy |
+|---|---|---|---|
+| Lighting proxy (brightness) | low / mid / high | 648 / 647 / 647 | 0.910 / 0.926 / 0.910 |
+| Coat-color proxy (saturation) | low / mid / high | 648 / 647 / 647 | 0.912 / 0.920 / 0.915 |
+| Label provenance | ai (seed) / pseudo | 78 / 1864 | 0.846 / 0.918 |
+| Dataset source | crawford | 1942 | 0.916 |
+
+No meaningful brightness- or saturation-bucket gap showed up (all within
+~1.6pp of each other, well inside noise for buckets this size). The one
+real gap is provenance (ai vs. pseudo, 0.846 vs. 0.918) — already known
+and explained above (pseudo accuracy is inflated by self-training
+confirmation bias, not a subgroup fairness issue). `dataset_source` is
+currently 100% `crawford` — the ANXIOUS external-Kaggle supplement was
+evaluated and not adopted (see above), so there are zero external-source
+images in the currently-deployed feature set; this axis is wired up for
+if/when that changes.
 
 ## Descoped: tail detection (Section 8 stretch)
 

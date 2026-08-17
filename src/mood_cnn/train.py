@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from src.config import load_config, resolve_path  # noqa: E402
 from src.mood_cnn.dataset import MoodDataset, IMAGENET_MEAN, IMAGENET_STD  # noqa: E402
 from src.mood_cnn.model import MoodCNN  # noqa: E402
+from src.reports.experiment_log import log_run  # noqa: E402
 
 
 @torch.no_grad()
@@ -187,6 +188,7 @@ def main():
     import json
     with open(reports_dir / "mood_cnn_metrics.json", "w") as f:
         json.dump(result, f, indent=2, default=str)
+    log_run("mood_cnn", result)
     return result
 
 
