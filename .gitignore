@@ -7,7 +7,7 @@ __pycache__/
 data/raw/
 data/processed/*
 # Exception: committed so the full pipeline is runnable without redoing
-# the seed-labeling visual-review step (see RUN.md).
+# the seed-labeling visual-review step.
 !data/processed/mood_labels_seed.csv
 
 # Trained artifacts (gitignored per brief)
@@ -19,6 +19,13 @@ Thumbs.db
 .vscode/
 .claude/
 
+# run.sh/stop.sh runtime state (PID file, server log)
+.run/
+
 # Secrets
 .env
 kaggle.json
+
+# Only README.md is published; other planning/reference docs stay local
+*.md
+!README.md
