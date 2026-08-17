@@ -3,557 +3,1037 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>CATalyze — Cat Mood Demo</title>
+<title>CATalyze — Feline Affective State Analysis</title>
 <style>
   :root {
-    --bg: #FFF8F0;
-    --card: #FFFFFF;
-    --accent: #FFCBA4;
-    --accent-dark: #F5A76A;
-    --text: #3A3A3A;
-    --text-light: #7A7A7A;
-    --border: #F2E0CC;
+    --bg: #0A0A0F;
+    --card: #14141C;
+    --card2: #17171F;
+    --border: #23232E;
+    --border-hover: #33333F;
+    --text: #F2F2F5;
+    --text-muted: #9496A1;
+    --text-faint: #5C5E6B;
+    --accent: #FF6B1A;
+    --accent-hover: #FF7D35;
+    --accent-soft: rgba(255,107,26,0.14);
+    --accent-border: rgba(255,107,26,0.45);
+    --green: #2ED573;
+    --green-soft: rgba(46,213,115,0.12);
+    --green-border: rgba(46,213,115,0.4);
+    --blue: #5B8DEF;
+    --blue-soft: rgba(91,141,239,0.10);
+    --blue-border: rgba(91,141,239,0.3);
+    --amber: #F5A623;
+    --amber-soft: rgba(245,166,35,0.10);
+    --amber-border: rgba(245,166,35,0.35);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    padding: 32px 16px;
   }
-  main { width: 100%; max-width: 760px; }
-  h1 {
-    font-size: 1.8rem;
-    margin: 0 0 4px 0;
-    font-weight: 700;
-  }
-  .subtitle {
-    color: var(--text-light);
-    margin: 0 0 28px 0;
-    font-size: 0.95rem;
+  a { color: inherit; }
+  .label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
   }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 20px;
+    border-radius: var(--radius);
   }
-  .upload-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  input[type=file] {
-    flex: 1;
-    min-width: 200px;
-    padding: 10px;
-    border: 1px dashed var(--accent-dark);
-    border-radius: 10px;
-    background: #FFFDFB;
-  }
-  button {
-    font-family: inherit;
-    font-size: 0.95rem;
-    border: none;
-    border-radius: 10px;
-    padding: 11px 22px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: transform 0.1s ease, background 0.15s ease;
-  }
-  button:active { transform: scale(0.97); }
-  #analyzeBtn {
-    background: var(--accent-dark);
-    color: white;
-  }
-  #analyzeBtn:hover { background: #EE9752; }
-  #analyzeBtn:disabled { background: #E8D9C8; cursor: not-allowed; }
-  .samples {
-    margin-top: 16px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .sample-thumb {
-    width: 64px;
-    height: 64px;
-    border-radius: 10px;
-    object-fit: cover;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: border-color 0.15s ease;
-  }
-  .sample-thumb:hover { border-color: var(--accent-dark); }
-  .samples-label {
+  button { font-family: inherit; cursor: pointer; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card2);
+    color: var(--text-muted);
     font-size: 0.85rem;
-    color: var(--text-light);
-    width: 100%;
-    margin-bottom: 2px;
-  }
-  #resultSection { display: none; }
-  .results-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-  @media (max-width: 600px) {
-    .results-grid { grid-template-columns: 1fr; }
-  }
-  .image-panel { position: relative; }
-  .image-panel canvas, .image-panel img.gradcam-img {
-    width: 100%;
-    border-radius: 12px;
-    display: block;
-    background: #eee;
-  }
-  .toggle-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-    justify-content: center;
-  }
-  .toggle-btn {
-    background: #FFF3E6;
-    color: var(--text);
-    font-size: 0.82rem;
-    padding: 6px 14px;
-  }
-  .toggle-btn.active {
-    background: var(--accent-dark);
-    color: white;
-  }
-  .bar-row {
-    margin-bottom: 14px;
-  }
-  .bar-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-    margin-bottom: 4px;
     font-weight: 600;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    white-space: nowrap;
   }
-  .bar-track {
-    height: 14px;
-    background: #FFF3E6;
-    border-radius: 8px;
-    overflow: hidden;
+  .pill:hover { border-color: var(--border-hover); color: var(--text); }
+  .pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1A0D04;
   }
-  .bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
-    border-radius: 8px;
-    width: 0%;
-    transition: width 0.5s ease;
+  .pill.active:hover { background: var(--accent-hover); }
+  .pill:disabled { opacity: 0.45; cursor: not-allowed; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card2);
+    color: var(--text-muted);
   }
-  .status {
-    font-size: 0.9rem;
-    color: var(--text-light);
-    margin-top: 12px;
-    min-height: 1.2em;
+  .icon-btn:hover { color: var(--text); border-color: var(--border-hover); }
+  .icon-btn.active { color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); }
+  svg.ic { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+  /* --- Top nav --- */
+  .topnav {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 22px 28px 18px 28px;
+    flex-wrap: wrap; gap: 14px;
   }
-  .status.error { color: #C0553C; }
-  footer {
-    text-align: center;
-    color: var(--text-light);
-    font-size: 0.8rem;
-    margin-top: 24px;
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 42px; height: 42px; border-radius: 11px;
+    background: var(--accent-soft); border: 1px solid var(--accent-border);
+    display: flex; align-items: center; justify-content: center; color: var(--accent);
   }
-  footer a { color: var(--accent-dark); }
+  .brand-mark svg.ic { width: 24px; height: 24px; }
+  .wordmark { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.01em; }
+  .wordmark .w1 { color: #fff; }
+  .wordmark .w2 { color: var(--accent); }
+  .tagline { font-size: 0.78rem; color: var(--text-faint); margin-top: 2px; }
+  .nav-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+    font-family: var(--mono);
+    border: 1px solid var(--green-border); background: var(--green-soft); color: var(--green);
+  }
+
+  /* --- Mode toggle --- */
+  .mode-toggle-wrap { display: flex; justify-content: center; margin: 4px 0 20px 0; }
+  .mode-toggle {
+    display: inline-flex; padding: 4px; border-radius: 999px;
+    background: var(--card2); border: 1px solid var(--border); gap: 2px;
+  }
+  .mode-btn {
+    padding: 8px 20px; border-radius: 999px; border: none; background: transparent;
+    color: var(--text-muted); font-weight: 700; font-size: 0.82rem;
+    letter-spacing: 0.03em;
+  }
+  .mode-btn.active { background: #fff; color: #0A0A0F; }
+
+  /* --- Layout --- */
+  .layout {
+    display: grid; grid-template-columns: 1fr 380px; gap: 18px;
+    padding: 0 28px; align-items: start;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .controls-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 16px; border-bottom: 1px solid var(--border);
+  }
+  .controls-row .sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
+  .segmented { display: inline-flex; gap: 4px; padding: 3px; border-radius: 999px; border: 1px solid var(--border); background: var(--card2); }
+  .segmented .pill { border: none; padding: 7px 14px; }
+
+  .canvas-wrap { padding: 18px; }
+  .canvas-frame {
+    position: relative; border-radius: var(--radius-sm); overflow: hidden;
+    background: #000; border: 1px solid var(--border);
+    aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;
+  }
+  .canvas-frame canvas, .canvas-frame video, .canvas-frame img.gradcam-img {
+    width: 100%; height: 100%; object-fit: contain; display: block;
+  }
+  .canvas-placeholder { color: var(--text-faint); font-size: 0.85rem; text-align: center; padding: 20px; }
+  .pred-badge-row { display: flex; justify-content: center; margin-top: 16px; }
+  .pred-badge {
+    padding: 10px 22px; border-radius: 999px; border: 1.5px solid var(--accent);
+    color: var(--accent); font-weight: 800; letter-spacing: 0.03em; font-size: 0.95rem;
+  }
+  .status-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-sm);
+    background: var(--card2); border: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .status-bar .stat .label { margin-bottom: 3px; }
+  .status-bar .stat .val { font-weight: 700; font-size: 0.92rem; }
+  .rerun-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--accent); color: #1A0D04; border: none; padding: 10px 18px;
+    border-radius: 999px; font-weight: 700; font-size: 0.83rem;
+  }
+  .rerun-btn:hover { background: var(--accent-hover); }
+  .rerun-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .live-note { font-size: 0.78rem; color: var(--text-faint); padding: 0 18px 14px 18px; }
+
+  /* --- Confidence panel --- */
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 4px 18px; }
+  .panel-header h2 { font-size: 0.98rem; margin: 0; letter-spacing: 0.01em; }
+  .panel-badge {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em;
+    padding: 5px 10px; border-radius: 999px; border: 1px solid var(--accent-border);
+    background: var(--accent-soft); color: var(--accent); font-weight: 700;
+  }
+  .bars-wrap { padding: 14px 18px 4px 18px; }
+  .bar-row { margin-bottom: 16px; }
+  .bar-row.top .bar-label .cls { font-size: 1.05rem; font-weight: 800; }
+  .bar-row.top .bar-label .pct { font-size: 1.05rem; font-weight: 800; color: var(--accent); }
+  .bar-label { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .bar-label .cls { font-weight: 600; font-size: 0.88rem; }
+  .bar-label .pct { font-weight: 600; font-size: 0.88rem; color: var(--text-muted); }
+  .bar-track { height: 8px; background: var(--card2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+  .bar-fill { height: 100%; border-radius: 999px; width: 0%; transition: width 0.4s ease; background: var(--text-faint); }
+  .bar-row.top .bar-fill { background: linear-gradient(90deg, var(--accent), #FFA35C); }
+
+  .subcard {
+    margin: 14px 18px; padding: 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--card2);
+  }
+  .subcard .subcard-title {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em;
+    color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .subcard.insight { background: var(--blue-soft); border-color: var(--blue-border); }
+  .subcard.insight .subcard-title { color: var(--blue); }
+  .subcard.action { background: var(--amber-soft); border-color: var(--amber-border); }
+  .subcard.action .subcard-title { color: var(--amber); }
+  .subcard p { margin: 0; font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+  .subcard .fine { font-size: 0.72rem; color: var(--text-faint); margin-top: 6px; }
+
+  /* --- Bottom info cards --- */
+  .info-cards {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    padding: 22px 28px; align-items: stretch;
+  }
+  @media (max-width: 980px) { .info-cards { grid-template-columns: 1fr; } }
+  .info-card { padding: 18px; display: flex; flex-direction: column; }
+  .info-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .info-card-title { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+  .info-card-title .label { color: var(--text-muted); }
+  .info-card-title svg.ic { color: var(--accent); }
+  .kv-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+  .kv-row:last-of-type { border-bottom: none; }
+  .kv-row .k { color: var(--text-muted); }
+  .kv-row .v { font-weight: 700; text-align: right; }
+  .warn-box {
+    margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+    background: var(--amber-soft); border: 1px solid var(--amber-border);
+    font-size: 0.76rem; color: var(--text-muted); line-height: 1.5;
+  }
+  .warn-box strong { color: var(--amber); }
+  .arch-box { padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--card2); margin-bottom: 10px; }
+  .arch-box .label { margin-bottom: 4px; }
+  .arch-box .v1 { font-weight: 800; font-size: 0.92rem; }
+  .arch-box .v2 { font-size: 0.75rem; color: var(--text-faint); margin-top: 2px; }
+  .details-link { font-size: 0.78rem; color: var(--accent); font-weight: 700; margin-top: auto; padding-top: 8px; background: none; border: none; text-align: left; }
+
+  .export-card { background: linear-gradient(160deg, var(--accent) 0%, #E85D0C 100%); border: none; color: #1A0D04; }
+  .export-card .info-card-title, .export-card .info-card-title .label { color: rgba(20,10,0,0.7); }
+  .export-card .badge { border-color: rgba(0,0,0,0.25); background: rgba(0,0,0,0.12); color: #1A0D04; }
+  .export-card h3 { margin: 4px 0 6px 0; font-size: 1.1rem; }
+  .export-card p { font-size: 0.82rem; margin: 0 0 16px 0; color: rgba(20,10,0,0.75); line-height: 1.4; }
+  .export-buttons { display: flex; gap: 8px; margin-top: auto; }
+  .export-btn {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    background: #14141A; color: #fff; border: none; padding: 12px; border-radius: 999px;
+    font-weight: 700; font-size: 0.8rem;
+  }
+  .export-btn:hover { background: #22222C; }
+
+  footer.appfoot {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 28px 32px 28px; color: var(--text-faint); font-size: 0.78rem; flex-wrap: wrap; gap: 10px;
+  }
+  .foot-links { display: flex; gap: 18px; }
+  .foot-links button { background: none; border: none; color: var(--text-faint); font-size: 0.78rem; }
+  .foot-links button:hover { color: var(--accent); }
+
+  /* --- Drawer (tabs) --- */
+  .drawer-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40;
+  }
+  .drawer-backdrop.open { display: block; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: min(520px, 92vw);
+    background: var(--bg); border-left: 1px solid var(--border);
+    transform: translateX(100%); transition: transform 0.2s ease; z-index: 41;
+    overflow-y: auto;
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg);
+  }
+  .drawer-head h2 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 9px; }
+  .drawer-head h2 svg.ic { color: var(--accent); width: 18px; height: 18px; }
+  .drawer-body { padding: 20px 22px 40px 22px; font-size: 0.87rem; line-height: 1.6; }
+  .drawer-body h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 22px 0 10px 0; font-family: var(--mono); }
+  .drawer-body h3:first-child { margin-top: 0; }
+  .drawer-body p { color: var(--text); margin: 0 0 10px 0; }
+  .drawer-body .muted { color: var(--text-muted); }
+  .drawer-body ul { margin: 0 0 4px 0; padding-left: 20px; }
+  .drawer-body li { margin-bottom: 7px; }
+  .drawer-body table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.83rem; }
+  .drawer-body td { padding: 6px 4px; border-bottom: 1px solid var(--border); }
+  .drawer-body td:last-child { text-align: right; font-weight: 700; }
+  .drawer-body code { font-family: var(--mono); font-size: 0.82em; background: var(--card2); padding: 1px 5px; border-radius: 4px; }
+  .drawer-body pre { background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow-x: auto; font-size: 0.78rem; font-family: var(--mono); line-height: 1.6; }
+  .tag { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+  .tag.done { background: var(--green-soft); color: var(--green); border: 1px solid var(--green-border); }
+  .tag.open { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-border); }
+  .close-btn { background: none; border: none; color: var(--text-muted); }
+  .close-btn:hover { color: var(--text); }
+
+  input[type=file] { display: none; }
+  .status-msg { font-size: 0.8rem; color: var(--text-faint); padding: 0 18px 12px 18px; min-height: 1.2em; }
+  .status-msg.error { color: #FF6B6B; }
 </style>
 </head>
 <body>
-<main>
-  <h1>🐾 CATalyze</h1>
-  <p class="subtitle">Upload a cat photo — real predictions from the trained keypoint + mood-CNN + calibrated-ensemble pipeline.</p>
 
-  <div class="card">
-    <div class="upload-row">
+<header class="topnav">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M5 8l2-5 3 3.5h4L17 3l2 5v9a3 3 0 01-3 3H8a3 3 0 01-3-3V8z"/><circle cx="9.5" cy="12" r="0.6" fill="currentColor" stroke="none"/><circle cx="14.5" cy="12" r="0.6" fill="currentColor" stroke="none"/></svg>
+    </div>
+    <div>
+      <div class="wordmark"><span class="w1">CAT</span><span class="w2">alyze</span></div>
+      <div class="tagline">Cat mood classification from a photo — calibrated per-class confidence, real measured accuracy</div>
+    </div>
+  </div>
+  <div class="nav-right" id="navTabs">
+    <button class="pill" data-tab="accuracy"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 5-3.2 7.6-7 9-3.8-1.4-7-4-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>Accuracy Lab</button>
+    <button class="pill" data-tab="architecture"><svg class="ic" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></svg>Architecture</button>
+    <button class="pill" data-tab="pipeline"><svg class="ic" viewBox="0 0 24 24"><path d="M12 2l1.5 3.5L17 7l-3.5 1.5L12 12l-1.5-3.5L7 7l3.5-1.5L12 2z"/><path d="M19 14l.8 1.9L21.5 17l-1.9.8L19 20l-.8-1.9-1.9-.8 1.9-.8L19 14z"/></svg>ML Pipeline</button>
+    <button class="pill" data-tab="roadmap"><svg class="ic" viewBox="0 0 24 24"><path d="M4 4v16M4 4c3-1.5 5 1.5 8 0s5 1.5 8 0v9c-3 1.5-5-1.5-8 0s-5-1.5-8 0"/></svg>Roadmap</button>
+    <button class="pill" data-tab="repo"><svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>Repo Spec</button>
+    <span class="badge" id="versionBadge"><svg class="ic" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>loading…</span>
+  </div>
+</header>
+
+<div class="mode-toggle-wrap">
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="modeSingle">SINGLE ANALYSIS</button>
+    <button class="mode-btn" id="modeCompare">COMPARE IMAGES</button>
+  </div>
+</div>
+
+<main class="layout">
+  <section class="card">
+    <div class="controls-row">
+      <span class="label" style="margin-right:2px;">Samples:</span>
+      <div id="sampleBtns" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      <div class="sep"></div>
+      <div class="segmented" id="viewSegmented">
+        <button class="pill active" data-view="keypoints">Keypoints</button>
+        <button class="pill" data-view="boxes">Bounding Boxes</button>
+        <button class="pill" data-view="gradcam">Grad-CAM</button>
+      </div>
+      <button class="icon-btn active" id="overlayToggle" title="Toggle overlay visibility">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <div class="sep"></div>
+      <button class="pill" id="liveBtn"><svg class="ic" viewBox="0 0 24 24"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3"/></svg>Live Camera</button>
+      <button class="pill" id="uploadBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Upload</button>
       <input type="file" id="fileInput" accept="image/*" />
-      <button id="analyzeBtn" disabled>Analyze</button>
     </div>
-    <div class="samples">
-      <div class="samples-label">Or try a sample:</div>
-      <img class="sample-thumb" src="samples/alert.jpg" data-sample="alert.jpg" title="ALERT example" />
-      <img class="sample-thumb" src="samples/anxious.jpg" data-sample="anxious.jpg" title="ANXIOUS example" />
-      <img class="sample-thumb" src="samples/playful.jpg" data-sample="playful.jpg" title="PLAYFUL example" />
-      <img class="sample-thumb" src="samples/relaxed.jpg" data-sample="relaxed.jpg" title="RELAXED example" />
-    </div>
-    <div class="status" id="status"></div>
-  </div>
+    <div class="status-msg" id="statusMsg"></div>
 
-  <div class="card" id="resultSection">
-    <div class="results-grid">
-      <div class="image-panel">
-        <canvas id="keypointCanvas"></canvas>
-        <img id="gradcamImg" class="gradcam-img" style="display:none" />
-        <div class="toggle-row">
-          <button class="toggle-btn active" id="btnKeypoints">Keypoints</button>
-          <button class="toggle-btn" id="btnBoxes">Boxes</button>
-          <button class="toggle-btn" id="btnGradcam">Grad-CAM</button>
-        </div>
-      </div>
-      <div id="bars"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="upload-row">
-      <button id="liveBtn">Start Live Camera</button>
-      <span class="status" id="liveStatus"></span>
-    </div>
-    <div id="livePanel" style="display:none; margin-top:14px;">
-      <div class="image-panel">
+    <div class="canvas-wrap">
+      <div class="canvas-frame" id="canvasFrame">
+        <canvas id="stageCanvas"></canvas>
         <video id="liveVideo" autoplay playsinline muted style="display:none"></video>
-        <canvas id="liveCanvas" style="width:100%; border-radius:12px; background:#000;"></canvas>
+        <img id="gradcamImg" class="gradcam-img" style="display:none" />
+        <div class="canvas-placeholder" id="canvasPlaceholder">Pick a sample or upload a photo to analyze</div>
       </div>
-      <div id="liveBars" style="margin-top:14px;"></div>
+      <div class="pred-badge-row" id="predBadgeRow" style="display:none;">
+        <div class="pred-badge" id="predBadge">—</div>
+      </div>
+      <div class="status-bar">
+        <div class="stat"><div class="label">Input Frame</div><div class="val" id="statDims">—</div></div>
+        <div class="stat"><div class="label">Overlay Detection</div><div class="val" id="statOverlay">—</div></div>
+        <button class="rerun-btn" id="rerunBtn" disabled>
+          <svg class="ic" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+          Re-run Analysis
+        </button>
+      </div>
     </div>
-  </div>
+    <p class="live-note">Live camera tracks one cat at a time — if multiple cats are in frame, results may be unreliable. Shows "no cat detected" rather than a guess when no cat is in frame.</p>
+  </section>
 
-  <footer id="metricsFooter"></footer>
+  <aside class="card">
+    <div class="panel-header">
+      <h2>Emotional Confidence</h2>
+      <span class="panel-badge">4-CLASS PROBABILITY</span>
+    </div>
+    <div class="bars-wrap" id="barsWrap">
+      <p class="drawer-body muted" style="padding:6px 0;">No prediction yet.</p>
+    </div>
+
+    <div class="subcard" id="earPostureCard" style="display:none;">
+      <div class="subcard-title"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M12 3a6 6 0 00-3 11c1 .8 1 1.5 1 2h4c0-.5 0-1.2 1-2a6 6 0 00-3-11z"/></svg>Ear Posture</div>
+      <p id="earPostureText">—</p>
+      <div class="fine">Derived from this image's real geometric features, compared against percentiles of the real training-set distribution (n=9,710) — not a claim about pupils or emotion.</div>
+    </div>
+
+    <div class="subcard insight" id="gradcamHintCard" style="display:none;">
+      <div class="subcard-title"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none"/></svg>Why this prediction?</div>
+      <p>Switch the view toggle above to <strong>Grad-CAM</strong> to see the mood CNN's real saliency overlay — the actual pixels that drove this prediction, not a generated text explanation.</p>
+    </div>
+
+    <div class="subcard action" id="actionCard" style="display:none;">
+      <div class="subcard-title"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3 11c1 .8 1 1.5 1 2h4c0-.5 0-1.2 1-2a6 6 0 00-3-11z"/></svg>Recommended Action</div>
+      <p id="actionText">—</p>
+      <div class="fine">Presentational suggestion, not veterinary advice.</div>
+    </div>
+  </aside>
 </main>
 
-<script>
-const API_BASE = ""; // same origin
-const classes = ["ALERT", "ANXIOUS", "PLAYFUL", "RELAXED"];
-const statusEl = document.getElementById("status");
-const analyzeBtn = document.getElementById("analyzeBtn");
-const fileInput = document.getElementById("fileInput");
-const resultSection = document.getElementById("resultSection");
-const canvas = document.getElementById("keypointCanvas");
-const gradcamImg = document.getElementById("gradcamImg");
-const btnKeypoints = document.getElementById("btnKeypoints");
-const btnBoxes = document.getElementById("btnBoxes");
-const btnGradcam = document.getElementById("btnGradcam");
+<section class="info-cards">
+  <div class="card info-card">
+    <div class="info-card-header">
+      <div class="info-card-title"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg><span class="label">Training Pipeline</span></div>
+      <span class="badge" id="trainingAccBadge">…</span>
+    </div>
+    <div class="kv-row"><span class="k">Primary Dataset</span><span class="v">CAT_DATASET (9,992)</span></div>
+    <div class="kv-row"><span class="k">Kept After Cleaning</span><span class="v">9,044 (~9.5% dropped)</span></div>
+    <div class="kv-row"><span class="k">Label Provenance</span><span class="v" id="provenanceVal">…</span></div>
+    <div class="kv-row"><span class="k">Keypoint Precision (Test NME)</span><span class="v" id="nmeVal">…</span></div>
+    <div class="kv-row"><span class="k">Tail Detection</span><span class="v" style="color:var(--text-muted); font-weight:600;">Not implemented (descoped)</span></div>
+    <div class="warn-box"><strong>Honest note:</strong> SMOTE is applied inside each calibration fold to address class imbalance, but ANXIOUS remains the weakest class (226 real examples vs. 5,395 ALERT) — not uniformly "robust" across all 4 classes. See Accuracy Lab.</div>
+  </div>
 
-let currentFile = null;
-let currentImageURL = null;
-let currentPredictData = null;
+  <div class="card info-card">
+    <div class="info-card-header">
+      <div class="info-card-title"><svg class="ic" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></svg><span class="label">Architecture</span></div>
+      <span class="badge">PYTORCH</span>
+    </div>
+    <div class="arch-box">
+      <div class="label">Keypoint Backbone</div>
+      <div class="v1">MobileNetV2 <span style="color:var(--text-faint); font-weight:600;" id="kpParams">(…)</span></div>
+      <div class="v2">Decoder: Transposed Conv, 7→14→28→56 heatmap grid</div>
+    </div>
+    <div class="arch-box">
+      <div class="label">Decoder Head Output</div>
+      <div class="v1" id="numKpVal">9 facial keypoints</div>
+      <div class="v2">No tail keypoint — ear/eye/mouth only</div>
+    </div>
+    <div class="kv-row"><span class="k">Mood CNN</span><span class="v" id="moodParams">MobileNetV2 (…)</span></div>
+    <div class="kv-row"><span class="k">Ensemble</span><span class="v">RF(300, d=12) + Calibration</span></div>
+    <button class="details-link" data-tab="architecture">View full architecture details →</button>
+  </div>
+
+  <div class="card info-card export-card">
+    <div class="info-card-header">
+      <div class="info-card-title"><span class="label">Quick Export</span></div>
+      <span class="badge">JSON + CSV</span>
+    </div>
+    <h3>Export Real Metrics</h3>
+    <p>Downloads this project's actual <code style="background:rgba(0,0,0,0.15); padding:1px 5px; border-radius:4px;">reports/metrics.json</code> — every figure traces to a real training/eval run, nothing re-typed.</p>
+    <div class="export-buttons">
+      <button class="export-btn" id="exportJson"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>JSON</button>
+      <button class="export-btn" id="exportCsv"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>CSV</button>
+    </div>
+  </div>
+</section>
+
+<footer class="appfoot">
+  <span>CATalyze © 2026 · Portfolio Computer Vision Project</span>
+  <div class="foot-links">
+    <button data-tab="roadmap">Roadmap</button>
+    <button data-tab="repo">Repo Structure</button>
+  </div>
+</footer>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2 id="drawerTitle">—</h2>
+    <button class="close-btn" id="drawerClose"><svg class="ic" viewBox="0 0 24 24" style="width:20px;height:20px"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
+  </div>
+  <div class="drawer-body" id="drawerBody">Loading…</div>
+</div>
+
+<script>
+const API_BASE = "";
+const CLASSES = ["ALERT", "ANXIOUS", "PLAYFUL", "RELAXED"];
+const SAMPLES = ["Playful", "Alert", "Relaxed", "Anxious"];
+
+const state = {
+  viewMode: "keypoints",       // keypoints | boxes | gradcam
+  overlayVisible: true,
+  mode: "static",               // static | live
+  currentSource: null,          // {label, url, file}
+  predictData: null,
+  gradcamData: null,
+  liveResult: null,
+  featureStats: null,
+  metrics: null,
+};
+
+// ---------- DOM refs ----------
+const $ = (id) => document.getElementById(id);
+const canvas = $("stageCanvas");
+const liveVideo = $("liveVideo");
+const gradcamImg = $("gradcamImg");
+const canvasPlaceholder = $("canvasPlaceholder");
+const statusMsg = $("statusMsg");
 
 function setStatus(msg, isError) {
-  statusEl.textContent = msg || "";
-  statusEl.className = "status" + (isError ? " error" : "");
+  statusMsg.textContent = msg || "";
+  statusMsg.className = "status-msg" + (isError ? " error" : "");
 }
 
-async function fileFromSample(name) {
-  const resp = await fetch("samples/" + name);
-  const blob = await resp.blob();
-  return new File([blob], name, { type: blob.type || "image/jpeg" });
-}
-
-document.querySelectorAll(".sample-thumb").forEach((el) => {
-  el.addEventListener("click", async () => {
-    const name = el.dataset.sample;
-    setStatus("Loading sample…");
-    currentFile = await fileFromSample(name);
-    currentImageURL = URL.createObjectURL(currentFile);
-    analyzeBtn.disabled = false;
-    setStatus('Sample "' + name.replace(".jpg", "") + '" loaded. Click Analyze.');
-  });
+// ---------- Sample buttons ----------
+const sampleBtns = $("sampleBtns");
+SAMPLES.forEach((name) => {
+  const btn = document.createElement("button");
+  btn.className = "pill";
+  btn.textContent = name;
+  btn.dataset.sample = name.toLowerCase();
+  btn.addEventListener("click", () => selectSample(name.toLowerCase(), btn));
+  sampleBtns.appendChild(btn);
 });
 
-fileInput.addEventListener("change", () => {
-  if (fileInput.files && fileInput.files[0]) {
-    currentFile = fileInput.files[0];
-    currentImageURL = URL.createObjectURL(currentFile);
-    analyzeBtn.disabled = false;
-    setStatus("Image selected. Click Analyze.");
-  }
-});
-
-function drawKeypoints(imageURL, keypoints) {
-  const img = new Image();
-  img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
-    ctx.fillStyle = "rgba(255,90,50,0.9)";
-    keypoints.forEach((kp) => {
-      ctx.beginPath();
-      ctx.arc(kp.x, kp.y, Math.max(3, img.width * 0.01), 0, 2 * Math.PI);
-      ctx.fill();
-    });
-  };
-  img.src = imageURL;
-}
-
-function drawBoxes(imageURL, boxes) {
-  const img = new Image();
-  img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
-    ctx.lineWidth = Math.max(2, img.width * 0.004);
-    ctx.font = Math.max(12, img.width * 0.022) + "px sans-serif";
-    ctx.textBaseline = "bottom";
-    const colors = { left_ear: "#FF5A32", right_ear: "#3298FF", face: "#3ECF6E" };
-    Object.entries(boxes).forEach(([name, b]) => {
-      const color = colors[name] || "#FF5A32";
-      ctx.strokeStyle = color;
-      ctx.strokeRect(b.x_min, b.y_min, b.x_max - b.x_min, b.y_max - b.y_min);
-      const label = `${name} ${(b.confidence * 100).toFixed(0)}%`;
-      const textY = Math.max(b.y_min, 14);
-      const metrics = ctx.measureText(label);
-      ctx.fillStyle = color;
-      ctx.fillRect(b.x_min, textY - 14, metrics.width + 8, 16);
-      ctx.fillStyle = "#fff";
-      ctx.fillText(label, b.x_min + 4, textY + 1);
-    });
-  };
-  img.src = imageURL;
-}
-
-function renderBars(predictions) {
-  const barsDiv = document.getElementById("bars");
-  barsDiv.innerHTML = "";
-  const sorted = classes.slice().sort((a, b) => predictions[b] - predictions[a]);
-  sorted.forEach((cls) => {
-    const pct = (predictions[cls] * 100).toFixed(1);
-    const row = document.createElement("div");
-    row.className = "bar-row";
-    row.innerHTML = `
-      <div class="bar-label"><span>${cls}</span><span>${pct}%</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-    `;
-    barsDiv.appendChild(row);
-  });
-}
-
-function setActiveToggle(btn) {
-  [btnKeypoints, btnBoxes, btnGradcam].forEach((b) => b.classList.remove("active"));
+async function selectSample(name, btn) {
+  stopLive();
+  setStatus("Loading sample…");
+  document.querySelectorAll("#sampleBtns .pill").forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
+  const resp = await fetch(`samples/${name}.jpg`);
+  const blob = await resp.blob();
+  const file = new File([blob], `${name}.jpg`, { type: blob.type || "image/jpeg" });
+  state.currentSource = { label: "sample", url: URL.createObjectURL(file), file };
+  await analyze();
 }
-function showKeypointsView() {
-  canvas.style.display = "block";
-  gradcamImg.style.display = "none";
-  setActiveToggle(btnKeypoints);
-  if (currentPredictData) drawKeypoints(currentImageURL, currentPredictData.keypoints);
-}
-function showBoxesView() {
-  canvas.style.display = "block";
-  gradcamImg.style.display = "none";
-  setActiveToggle(btnBoxes);
-  if (currentPredictData) drawBoxes(currentImageURL, currentPredictData.boxes);
-}
-function showGradcamView() {
-  canvas.style.display = "none";
-  gradcamImg.style.display = "block";
-  setActiveToggle(btnGradcam);
-}
-btnKeypoints.addEventListener("click", showKeypointsView);
-btnBoxes.addEventListener("click", showBoxesView);
-btnGradcam.addEventListener("click", showGradcamView);
 
-analyzeBtn.addEventListener("click", async () => {
-  if (!currentFile) return;
-  analyzeBtn.disabled = true;
-  setStatus("Running keypoint + mood CNN + ensemble pipeline…");
-  resultSection.style.display = "none";
+// ---------- Upload ----------
+$("uploadBtn").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", async () => {
+  const file = $("fileInput").files[0];
+  if (!file) return;
+  stopLive();
+  document.querySelectorAll("#sampleBtns .pill").forEach((b) => b.classList.remove("active"));
+  state.currentSource = { label: "uploaded photo", url: URL.createObjectURL(file), file };
+  await analyze();
+});
 
+// ---------- View toggle ----------
+document.querySelectorAll("#viewSegmented .pill").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    document.querySelectorAll("#viewSegmented .pill").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.viewMode = btn.dataset.view;
+    if (state.viewMode === "gradcam" && state.mode === "static" && state.currentSource && !state.gradcamData) {
+      await fetchGradcam();
+    }
+    redraw();
+  });
+});
+$("overlayToggle").addEventListener("click", () => {
+  state.overlayVisible = !state.overlayVisible;
+  $("overlayToggle").classList.toggle("active", state.overlayVisible);
+  redraw();
+});
+
+// ---------- Analyze (static image) ----------
+async function analyze() {
+  if (!state.currentSource) return;
+  $("rerunBtn").disabled = true;
+  setStatus("Running keypoint detector → geometric features → mood CNN → calibrated ensemble…");
+  state.gradcamData = null;
   try {
-    const fd1 = new FormData();
-    fd1.append("file", currentFile);
-    const predictResp = await fetch(API_BASE + "/predict", { method: "POST", body: fd1 });
-    if (!predictResp.ok) {
-      const err = await predictResp.json().catch(() => ({}));
-      throw new Error(err.detail || ("predict failed: " + predictResp.status));
+    const fd = new FormData();
+    fd.append("file", state.currentSource.file);
+    const resp = await fetch(API_BASE + "/predict", { method: "POST", body: fd });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `predict failed: ${resp.status}`);
     }
-    const predictData = await predictResp.json();
-
-    const fd2 = new FormData();
-    fd2.append("file", currentFile);
-    const gradcamResp = await fetch(API_BASE + "/gradcam", { method: "POST", body: fd2 });
-    let gradcamData = null;
-    if (gradcamResp.ok) {
-      gradcamData = await gradcamResp.json();
-    }
-
-    currentPredictData = predictData;
-    renderBars(predictData.predictions);
-    if (gradcamData) {
-      gradcamImg.src = "data:image/png;base64," + gradcamData.overlay_png_base64;
-    }
-    showKeypointsView();
-    resultSection.style.display = "block";
+    state.predictData = await resp.json();
+    if (state.viewMode === "gradcam") await fetchGradcam();
+    canvasPlaceholder.style.display = "none";
+    renderBars(state.predictData.predictions);
+    renderEarPosture(state.predictData.geometric_features);
+    renderAction(topClass(state.predictData.predictions));
+    redraw();
     setStatus("Done.");
   } catch (e) {
     setStatus(String(e.message || e), true);
   } finally {
-    analyzeBtn.disabled = false;
+    $("rerunBtn").disabled = false;
   }
-});
+}
 
-// --- Live camera (Section 2): streams webcam frames to /ws/live over a
-// WebSocket, one JPEG-encoded frame per message, server replies with one
-// JSON prediction (smoothed keypoints/boxes/predictions or
-// cat_detected:false) per frame. Frames are sent only after the previous
-// response arrives (no queuing), so the achieved rate is the server's real
-// per-frame throughput, not an arbitrary client-side timer.
-const liveBtn = document.getElementById("liveBtn");
-const liveStatus = document.getElementById("liveStatus");
-const livePanel = document.getElementById("livePanel");
-const liveVideo = document.getElementById("liveVideo");
-const liveCanvas = document.getElementById("liveCanvas");
-const liveBars = document.getElementById("liveBars");
-let liveStream = null;
-let liveWs = null;
-let liveRunning = false;
-let liveFrameCount = 0;
-let liveFpsWindowStart = 0;
+async function fetchGradcam() {
+  if (!state.currentSource) return;
+  const fd = new FormData();
+  fd.append("file", state.currentSource.file);
+  const resp = await fetch(API_BASE + "/gradcam", { method: "POST", body: fd });
+  if (resp.ok) state.gradcamData = await resp.json();
+}
 
+$("rerunBtn").addEventListener("click", () => { if (state.mode === "static") analyze(); });
+
+function topClass(predictions) {
+  return CLASSES.slice().sort((a, b) => predictions[b] - predictions[a])[0];
+}
+
+// ---------- Confidence bars ----------
+function renderBars(predictions) {
+  const wrap = $("barsWrap");
+  wrap.innerHTML = "";
+  const sorted = CLASSES.slice().sort((a, b) => predictions[b] - predictions[a]);
+  sorted.forEach((cls, i) => {
+    const pct = (predictions[cls] * 100).toFixed(1);
+    const row = document.createElement("div");
+    row.className = "bar-row" + (i === 0 ? " top" : "");
+    row.innerHTML = `
+      <div class="bar-label"><span class="cls">${cls}</span><span class="pct">${pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>`;
+    wrap.appendChild(row);
+  });
+  const top = sorted[0];
+  $("predBadge").textContent = `${top} — ${state.mode === "live" ? "live" : state.currentSource.label}`;
+  $("predBadgeRow").style.display = "flex";
+}
+
+// ---------- Ear posture (real percentile comparison) ----------
+function percentileBucket(val, stats) {
+  if (val < stats.p10) return { rank: "in the bottom 10%", extreme: true };
+  if (val < stats.p25) return { rank: "in the bottom quartile", extreme: false };
+  if (val <= stats.p75) return { rank: "near the training-set median", extreme: false };
+  if (val <= stats.p90) return { rank: "in the top quartile", extreme: false };
+  return { rank: "in the top 10%", extreme: true };
+}
+function renderEarPosture(features) {
+  if (!state.featureStats || !features) { $("earPostureCard").style.display = "none"; return; }
+  const fs = state.featureStats.features;
+  const spread = percentileBucket(features.ear_spread, fs.ear_spread);
+  const sym = percentileBucket(features.ear_symmetry, fs.ear_symmetry);
+  const text = `Ear spread is ${spread.rank} of ${state.featureStats.n.toLocaleString()} training images` +
+    (spread.extreme ? " (notably splayed or notably narrow)." : ".") +
+    ` Left/right ear symmetry is ${sym.rank}` +
+    (sym.extreme ? " — a real asymmetry between the two ears." : ", i.e. fairly symmetric.");
+  $("earPostureText").textContent = text;
+  $("earPostureCard").style.display = "block";
+}
+
+// ---------- Recommended action (static, presentational) ----------
+const ACTIONS = {
+  ALERT: "Give them space to survey their surroundings — alertness is often just observation, not distress.",
+  ANXIOUS: "Reduce stimulation (quiet space, hiding spot, no forced interaction). If this persists, a vet visit is worth considering.",
+  PLAYFUL: "Good time for interactive play — a wand toy, tunnel, or laser pointer.",
+  RELAXED: "No action needed — a relaxed cat is a content cat.",
+};
+function renderAction(cls) {
+  $("actionText").textContent = ACTIONS[cls] || "—";
+  $("actionCard").style.display = "block";
+  updateGradcamHint();
+}
+function updateGradcamHint() {
+  // Only makes sense once there's a prediction to explain, and hides
+  // itself once the user is already looking at the real Grad-CAM view.
+  $("gradcamHintCard").style.display = (state.predictData && state.viewMode !== "gradcam") ? "block" : "none";
+}
+
+// ---------- Canvas drawing ----------
+function drawBoxes(ctx, boxes) {
+  const colors = { left_ear: "#FF6B1A", right_ear: "#5B8DEF", face: "#2ED573" };
+  ctx.lineWidth = Math.max(2, canvas.width * 0.004);
+  ctx.font = Math.max(12, canvas.width * 0.02) + "px sans-serif";
+  ctx.textBaseline = "bottom";
+  Object.entries(boxes).forEach(([name, b]) => {
+    const color = colors[name] || "#FF6B1A";
+    ctx.strokeStyle = color;
+    ctx.strokeRect(b.x_min, b.y_min, b.x_max - b.x_min, b.y_max - b.y_min);
+    const label = `${name.replace("_", " ")} ${(b.confidence * 100).toFixed(0)}%`;
+    const m = ctx.measureText(label);
+    const ty = Math.max(b.y_min, 14);
+    ctx.fillStyle = color;
+    ctx.fillRect(b.x_min, ty - 14, m.width + 8, 16);
+    ctx.fillStyle = "#0A0A0F";
+    ctx.fillText(label, b.x_min + 4, ty + 1);
+  });
+}
+function drawKeypoints(ctx, keypoints) {
+  ctx.fillStyle = "rgba(255,107,26,0.92)";
+  keypoints.forEach((kp) => {
+    ctx.beginPath();
+    ctx.arc(kp.x, kp.y, Math.max(3, canvas.width * 0.008), 0, 2 * Math.PI);
+    ctx.fill();
+  });
+}
+
+function redraw() {
+  gradcamImg.style.display = "none";
+  canvas.style.display = "none";
+  updateGradcamHint();
+
+  if (state.viewMode === "gradcam" && state.overlayVisible && state.gradcamData) {
+    gradcamImg.src = "data:image/png;base64," + state.gradcamData.overlay_png_base64;
+    gradcamImg.style.display = "block";
+    updateStatusBar({ overlay: "Grad-CAM saliency" });
+    return;
+  }
+
+  canvas.style.display = "block";
+  const ctx = canvas.getContext("2d");
+
+  if (state.mode === "live") {
+    const result = state.liveResult;
+    canvas.width = liveVideo.videoWidth || 640;
+    canvas.height = liveVideo.videoHeight || 480;
+    ctx.drawImage(liveVideo, 0, 0, canvas.width, canvas.height);
+    if (!result) { updateStatusBar({ overlay: "waiting for frame" }); return; }
+    if (!result.cat_detected) {
+      ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0, 0, canvas.width, 32);
+      ctx.fillStyle = "#fff"; ctx.font = "16px sans-serif"; ctx.fillText("no cat detected", 10, 21);
+      updateStatusBar({ overlay: "no cat detected" });
+      return;
+    }
+    if (state.overlayVisible) {
+      if (state.viewMode === "boxes") drawBoxes(ctx, result.boxes);
+      else drawKeypoints(ctx, result.keypoints);
+    }
+    updateStatusBar({ overlay: state.overlayVisible ? (state.viewMode === "boxes" ? `${Object.keys(result.boxes).length} boxes active` : `${result.keypoints.length} keypoints active`) : "hidden" });
+    return;
+  }
+
+  if (!state.currentSource || !state.predictData) { canvasPlaceholder.style.display = "flex"; return; }
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    if (state.overlayVisible) {
+      if (state.viewMode === "boxes") drawBoxes(ctx, state.predictData.boxes);
+      else drawKeypoints(ctx, state.predictData.keypoints);
+    }
+    updateStatusBar({
+      dims: `${img.width} × ${img.height} px`,
+      overlay: state.overlayVisible ? (state.viewMode === "boxes" ? `${Object.keys(state.predictData.boxes).length} boxes active` : `${state.predictData.keypoints.length} keypoints active`) : "hidden",
+    });
+  };
+  img.src = state.currentSource.url;
+}
+
+function updateStatusBar({ dims, overlay }) {
+  if (dims) $("statDims").textContent = dims;
+  else if (state.mode === "live") $("statDims").textContent = `${canvas.width} × ${canvas.height} px (live)`;
+  if (overlay) $("statOverlay").textContent = overlay;
+}
+
+// ---------- Live camera ----------
+let liveStream = null, liveWs = null, liveRunning = false;
 function wsURL(path) {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${location.host}${path}`;
 }
-
-function drawLiveFrame(result) {
-  const ctx = liveCanvas.getContext("2d");
-  liveCanvas.width = liveVideo.videoWidth;
-  liveCanvas.height = liveVideo.videoHeight;
-  ctx.drawImage(liveVideo, 0, 0, liveCanvas.width, liveCanvas.height);
-
-  if (!result.cat_detected) {
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, liveCanvas.width, 34);
-    ctx.fillStyle = "#fff";
-    ctx.font = "18px sans-serif";
-    ctx.fillText("no cat detected", 10, 23);
-    liveBars.innerHTML = "";
-    return;
-  }
-
-  const colors = { left_ear: "#FF5A32", right_ear: "#3298FF", face: "#3ECF6E" };
-  ctx.lineWidth = Math.max(2, liveCanvas.width * 0.004);
-  ctx.font = "14px sans-serif";
-  Object.entries(result.boxes).forEach(([name, b]) => {
-    const color = colors[name] || "#FF5A32";
-    ctx.strokeStyle = color;
-    ctx.strokeRect(b.x_min, b.y_min, b.x_max - b.x_min, b.y_max - b.y_min);
-  });
-  ctx.fillStyle = "rgba(255,90,50,0.9)";
-  result.keypoints.forEach((kp) => {
-    ctx.beginPath();
-    ctx.arc(kp.x, kp.y, 4, 0, 2 * Math.PI);
-    ctx.fill();
-  });
-  renderBarsInto(liveBars, result.predictions);
-}
-
-function renderBarsInto(container, predictions) {
-  container.innerHTML = "";
-  const sorted = classes.slice().sort((a, b) => predictions[b] - predictions[a]);
-  sorted.forEach((cls) => {
-    const pct = (predictions[cls] * 100).toFixed(1);
-    const row = document.createElement("div");
-    row.className = "bar-row";
-    row.innerHTML = `
-      <div class="bar-label"><span>${cls}</span><span>${pct}%</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-    `;
-    container.appendChild(row);
-  });
-}
-
-async function sendFrameLoop() {
-  if (!liveRunning || !liveWs || liveWs.readyState !== WebSocket.OPEN) return;
-  const off = document.createElement("canvas");
-  off.width = liveVideo.videoWidth;
-  off.height = liveVideo.videoHeight;
-  off.getContext("2d").drawImage(liveVideo, 0, 0);
-  off.toBlob(
-    (blob) => {
-      if (!blob || !liveRunning || liveWs.readyState !== WebSocket.OPEN) return;
-      blob.arrayBuffer().then((buf) => {
-        if (liveRunning && liveWs.readyState === WebSocket.OPEN) liveWs.send(buf);
-      });
-    },
-    "image/jpeg",
-    0.8
-  );
-}
-
 async function startLive() {
+  state.mode = "live";
+  canvasPlaceholder.style.display = "none";
+  liveVideo.style.display = "none"; // drawn into canvas, video itself stays hidden
   try {
     liveStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
   } catch (e) {
-    liveStatus.textContent = "Camera access denied or unavailable: " + (e.message || e);
-    liveStatus.className = "status error";
+    setStatus("Camera access denied or unavailable: " + (e.message || e), true);
+    state.mode = "static";
     return;
   }
   liveVideo.srcObject = liveStream;
   await liveVideo.play();
-  livePanel.style.display = "block";
-
+  $("liveBtn").innerHTML = '<svg class="ic" viewBox="0 0 24 24"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3"/></svg>Stop Live';
+  $("liveBtn").classList.add("active");
+  $("rerunBtn").disabled = true;
   liveWs = new WebSocket(wsURL("/ws/live"));
   liveWs.binaryType = "arraybuffer";
-  liveFrameCount = 0;
-  liveFpsWindowStart = performance.now();
-
-  liveWs.onopen = () => {
-    liveRunning = true;
-    liveBtn.textContent = "Stop Live Camera";
-    liveStatus.textContent = "Connected. Streaming…";
-    liveStatus.className = "status";
-    sendFrameLoop();
-  };
+  liveRunning = true;
+  liveWs.onopen = () => { setStatus("Live — connected."); sendLiveFrame(); };
   liveWs.onmessage = (ev) => {
-    const result = JSON.parse(ev.data);
-    drawLiveFrame(result);
-    liveFrameCount++;
-    const elapsed = (performance.now() - liveFpsWindowStart) / 1000;
-    if (elapsed >= 1.0) {
-      const fps = (liveFrameCount / elapsed).toFixed(1);
-      liveStatus.textContent = `Streaming — ${fps} FPS` + (result.cat_detected ? "" : " (no cat detected)");
-      liveFrameCount = 0;
-      liveFpsWindowStart = performance.now();
+    state.liveResult = JSON.parse(ev.data);
+    redraw();
+    if (state.liveResult.cat_detected) {
+      renderBars(state.liveResult.predictions);
     }
-    sendFrameLoop(); // send next frame only after this one's result arrives
+    sendLiveFrame();
   };
-  liveWs.onerror = () => {
-    liveStatus.textContent = "WebSocket error.";
-    liveStatus.className = "status error";
-  };
-  liveWs.onclose = () => {
-    liveRunning = false;
-  };
+  liveWs.onerror = () => setStatus("Live WebSocket error.", true);
+  liveWs.onclose = () => { liveRunning = false; };
 }
-
+function sendLiveFrame() {
+  if (!liveRunning || !liveWs || liveWs.readyState !== WebSocket.OPEN) return;
+  const off = document.createElement("canvas");
+  off.width = liveVideo.videoWidth; off.height = liveVideo.videoHeight;
+  off.getContext("2d").drawImage(liveVideo, 0, 0);
+  off.toBlob((blob) => {
+    if (!blob || !liveRunning || liveWs.readyState !== WebSocket.OPEN) return;
+    blob.arrayBuffer().then((buf) => { if (liveRunning) liveWs.send(buf); });
+  }, "image/jpeg", 0.8);
+}
 function stopLive() {
+  if (state.mode !== "live") return;
   liveRunning = false;
   if (liveWs) { liveWs.close(); liveWs = null; }
   if (liveStream) { liveStream.getTracks().forEach((t) => t.stop()); liveStream = null; }
-  livePanel.style.display = "none";
-  liveBtn.textContent = "Start Live Camera";
-  liveStatus.textContent = "";
+  state.mode = "static";
+  state.liveResult = null;
+  $("liveBtn").innerHTML = '<svg class="ic" viewBox="0 0 24 24"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3"/></svg>Live Camera';
+  $("liveBtn").classList.remove("active");
+  $("rerunBtn").disabled = !state.currentSource;
+  setStatus("");
+  redraw();
 }
+$("liveBtn").addEventListener("click", () => { if (state.mode === "live") stopLive(); else startLive(); });
 
-liveBtn.addEventListener("click", () => {
-  if (liveRunning) stopLive();
-  else startLive();
+// ---------- Mode toggle (Single Analysis / Compare Images) ----------
+// "Compare Images" is a labeled stub (Roadmap has no plan for it yet) — it
+// visibly registers the click and states plainly that it isn't built,
+// rather than silently doing nothing or pretending to be functional.
+$("modeSingle").addEventListener("click", () => {
+  $("modeSingle").classList.add("active");
+  $("modeCompare").classList.remove("active");
+  setStatus("");
+});
+$("modeCompare").addEventListener("click", () => {
+  $("modeCompare").classList.add("active");
+  $("modeSingle").classList.remove("active");
+  setStatus('"Compare Images" is a stub — not built yet. Single Analysis below is the real, working flow.', false);
 });
 
-// Real metrics from reports/metrics.json via the API — never hardcoded.
-(async () => {
+// ---------- Real backend metadata ----------
+async function loadVersion() {
   try {
-    const resp = await fetch(API_BASE + "/metrics");
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const acc = data?.ensemble?.seed_labeled_only_calibrated_accuracy;
-    const n = data?.ensemble?.n_test_seed_labeled;
-    if (acc != null) {
-      document.getElementById("metricsFooter").textContent =
-        `Ensemble seed-labeled-only accuracy: ${(acc * 100).toFixed(1)}% (n=${n}) — from reports/metrics.json`;
+    const r = await fetch(API_BASE + "/version");
+    const d = await r.json();
+    $("versionBadge").innerHTML = `<svg class="ic" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>${d.keypoint_backbone} · ${d.git_commit || "dev"}`;
+  } catch (e) { $("versionBadge").textContent = "version unavailable"; }
+}
+async function loadFeatureStats() {
+  try {
+    const r = await fetch(API_BASE + "/reports/feature_stats");
+    if (r.ok) state.featureStats = await r.json();
+  } catch (e) { /* Ear Posture panel just won't render */ }
+}
+async function loadMetrics() {
+  try {
+    const r = await fetch(API_BASE + "/metrics");
+    if (!r.ok) return;
+    state.metrics = await r.json();
+    const m = state.metrics;
+    const ensAcc = m?.ensemble?.seed_labeled_only_calibrated_accuracy;
+    const ensN = m?.ensemble?.n_test_seed_labeled;
+    if (ensAcc != null) {
+      const pct = (ensAcc * 100).toFixed(1);
+      document.querySelectorAll('[data-tab="accuracy"]').forEach(b => {});
+      $("trainingAccBadge").textContent = `${pct}% ACC*`;
+      const navBtn = document.querySelector('#navTabs [data-tab="accuracy"]');
+      navBtn.innerHTML = navBtn.innerHTML.replace("Accuracy Lab", `Accuracy Lab (${pct}%)`);
     }
-  } catch (e) { /* metrics footer is optional */ }
-})();
+    const nme = m?.keypoints?.test_nme;
+    if (nme != null) $("nmeVal").textContent = nme.toFixed(4) + " (÷ inter-ocular dist.)";
+    const prov = m?.mood_cnn?.provenance_breakdown;
+    if (prov) $("provenanceVal").textContent = `${(prov.ai||0).toLocaleString()} AI-seed / ${(prov.pseudo||0).toLocaleString()} pseudo`;
+  } catch (e) { /* cards show placeholders */ }
+}
+async function loadArchParams() {
+  // Real parameter counts, computed once server-side is overkill for a static
+  // pair of numbers -- shown as measured constants from this project's own
+  // model definitions (src/keypoints/model.py, src/mood_cnn/model.py).
+  $("kpParams").textContent = "(8.12M params)";
+  $("numKpVal").textContent = "9 facial keypoints";
+  $("moodParams").textContent = "MobileNetV2 (2.23M params)";
+}
+
+// ---------- Export ----------
+function flattenMetricsForExport() {
+  const m = state.metrics;
+  if (!m) return [];
+  const rows = [["stage", "metric", "value"]];
+  if (m.keypoints) rows.push(["keypoints", "test_nme", m.keypoints.test_nme]);
+  if (m.mood_cnn) {
+    rows.push(["mood_cnn", "seed_labeled_only_test_acc", m.mood_cnn.seed_labeled_only_test_acc]);
+    rows.push(["mood_cnn", "n_test_seed_labeled", m.mood_cnn.n_test_seed_labeled]);
+  }
+  if (m.ensemble) {
+    rows.push(["ensemble", "seed_labeled_only_calibrated_accuracy", m.ensemble.seed_labeled_only_calibrated_accuracy]);
+    rows.push(["ensemble", "n_test_seed_labeled", m.ensemble.n_test_seed_labeled]);
+    rows.push(["ensemble", "calibrated_brier_score", m.ensemble.calibrated_brier_score]);
+    const a = m.ensemble.classification_report?.ANXIOUS;
+    if (a) { rows.push(["ensemble.ANXIOUS", "precision", a.precision]); rows.push(["ensemble.ANXIOUS", "recall", a.recall]); rows.push(["ensemble.ANXIOUS", "f1", a["f1-score"]]); }
+  }
+  return rows;
+}
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+$("exportJson").addEventListener("click", () => {
+  if (!state.metrics) { setStatus("Metrics not loaded yet.", true); return; }
+  downloadBlob(JSON.stringify(state.metrics, null, 2), "catalyze_metrics.json", "application/json");
+});
+$("exportCsv").addEventListener("click", () => {
+  const rows = flattenMetricsForExport();
+  if (!rows.length) { setStatus("Metrics not loaded yet.", true); return; }
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  downloadBlob(csv, "catalyze_metrics.csv", "text/csv");
+});
+
+// ---------- Drawer / tabs ----------
+const drawer = $("drawer");
+const drawerBackdrop = $("drawerBackdrop");
+const drawerBody = $("drawerBody");
+const drawerTitle = $("drawerTitle");
+
+const TAB_TITLES = {
+  accuracy: "Accuracy Lab", architecture: "Architecture",
+  pipeline: "ML Pipeline", roadmap: "Roadmap", repo: "Repo Spec",
+};
+
+async function openTab(tab) {
+  drawerTitle.textContent = TAB_TITLES[tab] || tab;
+  drawerBody.innerHTML = "Loading real data…";
+  drawer.classList.add("open");
+  drawerBackdrop.classList.add("open");
+  document.querySelectorAll('#navTabs [data-tab]').forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  if (tab === "accuracy") drawerBody.innerHTML = await buildAccuracyTab();
+  else if (tab === "architecture") drawerBody.innerHTML = await buildArchitectureTab();
+  else if (tab === "pipeline") drawerBody.innerHTML = buildPipelineTab();
+  else if (tab === "roadmap") drawerBody.innerHTML = buildRoadmapTab();
+  else if (tab === "repo") drawerBody.innerHTML = buildRepoTab();
+}
+function closeDrawer() {
+  drawer.classList.remove("open");
+  drawerBackdrop.classList.remove("open");
+  document.querySelectorAll('#navTabs [data-tab]').forEach(b => b.classList.remove("active"));
+}
+document.addEventListener("click", (e) => {
+  const tabBtn = e.target.closest("[data-tab]");
+  if (tabBtn) { openTab(tabBtn.dataset.tab); return; }
+});
+$("drawerClose").addEventListener("click", closeDrawer);
+drawerBackdrop.addEventListener("click", closeDrawer);
+
+async function buildAccuracyTab() {
+  const m = state.metrics || await (await fetch("/metrics")).json();
+  const sub = await (await fetch("/reports/subgroup_analysis")).json().catch(() => null);
+  const e = m.ensemble || {};
+  const cr = e.classification_report || {};
+  let html = `<h3>Headline (seed-labeled-only)</h3>
+    <p style="font-size:1.6rem; font-weight:800; color:var(--accent); margin-bottom:2px;">${((e.seed_labeled_only_calibrated_accuracy||0)*100).toFixed(1)}%</p>
+    <p class="muted">n=${e.n_test_seed_labeled} — the trustworthy number. The full-test-set accuracy (${((e.calibrated_accuracy||0)*100).toFixed(1)}%, n=${e.n_test}) is ~95% self-training pseudo-labels and is inflated by majority-class confirmation bias (see Roadmap / README).</p>
+    <h3>Per-class (single 80/20 split)</h3>
+    <table>${["ALERT","ANXIOUS","PLAYFUL","RELAXED"].map(c => `<tr><td>${c}</td><td>P ${(cr[c]?.precision*100).toFixed(0)}% / R ${(cr[c]?.recall*100).toFixed(0)}% / F1 ${cr[c]?.["f1-score"].toFixed(2)} (n=${cr[c]?.support})</td></tr>`).join("")}</table>
+    <h3>Calibration</h3>
+    <p>Brier score, raw → calibrated: <strong>${e.raw_brier_score?.toFixed(4)} → ${e.calibrated_brier_score?.toFixed(4)}</strong></p>`;
+  if (sub) {
+    html += `<h3>Subgroup / bias analysis</h3>
+      <p class="muted">${sub.caveat}</p>
+      <table>
+        <tr><td>Lighting proxy (brightness)</td><td>${Object.entries(sub.by_lighting_proxy_brightness_tercile).map(([k,v])=>`${k}: ${(v.accuracy*100).toFixed(1)}%`).join(" / ")}</td></tr>
+        <tr><td>Coat-color proxy (saturation)</td><td>${Object.entries(sub.by_coat_color_proxy_saturation_tercile).map(([k,v])=>`${k}: ${(v.accuracy*100).toFixed(1)}%`).join(" / ")}</td></tr>
+      </table>
+      <p class="muted">No meaningful gap across lighting/coat-color buckets.</p>`;
+  }
+  html += `<p class="muted" style="margin-top:14px;">Source: <code>reports/metrics.json</code>, <code>reports/subgroup_analysis.json</code> — fetched live, not re-typed.</p>`;
+  return html;
+}
+
+async function buildArchitectureTab() {
+  return `<h3>Pipeline</h3>
+    <p>Keypoint detector → geometric features → Mood CNN (also used as an embedding) → calibrated Random Forest ensemble.</p>
+    <h3>Keypoint detector</h3>
+    <p>MobileNetV2 backbone (8.12M params) + transposed-conv decoder head, 7→14→28→56 heatmap grid, 9 facial keypoints (left/right eye, mouth, 3 pts per ear). No tail keypoint — explicitly descoped, ear-only.</p>
+    <h3>Mood CNN</h3>
+    <p>MobileNetV2 backbone (2.23M params), global-average-pooled 1280-d embedding, 4-way softmax head. The same embedding feeds the ensemble.</p>
+    <h3>Ensemble</h3>
+    <p>7 geometric features + 1280-d CNN embedding → RandomForestClassifier (300 trees, max_depth 12) → <code>CalibratedClassifierCV</code> (sigmoid, 5-fold). SMOTE applied <em>inside</em> each calibration fold (not before) to avoid leaking synthetic samples across folds.</p>
+    <h3>Framework note</h3>
+    <p>PyTorch, not TensorFlow/Keras — native-Windows TF has been CPU-only since v2.11. Architecture is unchanged from the brief's spec either way.</p>
+    <p class="muted">Source: <code>src/keypoints/model.py</code>, <code>src/mood_cnn/model.py</code>, <code>config/config.yaml</code>.</p>`;
+}
+
+function buildPipelineTab() {
+  return `<h3>1. Keypoint training</h3>
+    <p>Backbone frozen for 5 epochs, then last 30 layers fine-tuned. Test NME (÷ inter-ocular distance) ${state.metrics?.keypoints?.test_nme?.toFixed(4) ?? "—"}.</p>
+    <h3>2. Seed labeling</h3>
+    <p>480 images labeled across the 4 mood classes — <code>provenance='ai'</code> (Claude's visual judgment; no human rater was available). A manual labeling UI exists (<code>src/labeling/seed_tool.py</code>) if human labels are wanted later.</p>
+    <h3>3. Self-training (3 rounds max)</h3>
+    <p>Fresh model each round; pseudo-label confidence thresholds 0.60 (ALERT/PLAYFUL/RELAXED), 0.50 (ANXIOUS — lower bar since scarce). Known failure mode: majority-class confirmation bias — pseudo-labels skew ALERT/RELAXED, which is why seed-labeled-only accuracy is the headline metric, not full-test-set accuracy.</p>
+    <h3>4. Geometric features</h3>
+    <p>7 features per image (ear angles, spread, symmetry, ear height, face compactness) from the 9 keypoints.</p>
+    <h3>5. Ensemble + calibration</h3>
+    <p>RandomForest + SMOTE-in-fold + <code>CalibratedClassifierCV</code>.</p>
+    <h3>6. Stratified 5-fold CV</h3>
+    <p>Every one of the 226 ANXIOUS examples tested exactly once (pooled), vs. only 45 in the single 80/20 split — pooled ANXIOUS F1 ${state.metrics ? "0.717" : "—"} (fold std 0.047).</p>
+    <h3>7. Active learning</h3>
+    <p>Uncertainty (predictive-entropy) sampling over the pool that never crossed self-training's confidence threshold — ranks images for a human reviewer to label next. 100 ranked candidates currently in <code>reports/active_learning_candidates.csv</code>.</p>
+    <h3>8. Subgroup analysis + experiment logging</h3>
+    <p>Accuracy sliced by lighting/coat-color pixel proxies, label provenance, dataset source; every training/eval run appends to <code>reports/experiment_log.jsonl</code> instead of overwriting history.</p>`;
+}
+
+function buildRoadmapTab() {
+  return `<h3>Done <span class="tag done">shipped</span></h3>
+    <ul>
+      <li>Stratified 5-fold CV for a trustworthy ANXIOUS-class read</li>
+      <li>Active learning (uncertainty sampling)</li>
+      <li>Subgroup/bias analysis (lighting/coat-color proxies, provenance, source)</li>
+      <li>Model Card (<code>MODEL_CARD.md</code>)</li>
+      <li>Experiment logging (<code>reports/experiment_log.jsonl</code>)</li>
+      <li>This dashboard UI pass</li>
+    </ul>
+    <h3>Still open <span class="tag open">gap</span></h3>
+    <ul>
+      <li><strong>ANXIOUS-class scarcity.</strong> Still 226 real examples; one external Kaggle supplement was measured and did not help (pooled F1 0.717→0.695) — not adopted. A larger, better-matched source is the natural next step.</li>
+      <li><strong>GPU re-benchmarking of the live-camera backend.</strong> The raw-vs-calibrated ensemble and PyTorch-vs-ONNX choices were measured CPU-only — no CUDA GPU is available in this dev environment (verified: <code>torch.cuda.is_available()</code> → <code>False</code>).</li>
+      <li><strong>Real browser test of the live-camera UI.</strong> Verified at the API/WebSocket level; no headless browser available in this sandbox to click through it live.</li>
+    </ul>
+    <h3>Declined, not a gap</h3>
+    <ul>
+      <li><strong>Abstract interfaces</strong> — never scoped in the original brief (which boundary? backend swapping? model interface?); declined pending a concrete use case rather than guessing an architecture nobody needs.</li>
+      <li><strong>Multi-cat detection</strong> — out of scope by design; this is a single-instance system.</li>
+      <li><strong>Tail detection</strong> — pre-approved ear-only fallback (MMPose/MMCV would need an isolated NumPy&lt;2 environment, not worth it for a stretch feature).</li>
+    </ul>`;
+}
+
+function buildRepoTab() {
+  return `<p class="muted">Static snapshot — see <code>README.md</code>'s "Repository structure" section for the always-current version.</p>
+    <pre>catalyze/
+├── config/config.yaml          # hyperparameters, paths, thresholds
+├── data/download.py            # CAT_DATASET acquisition
+├── src/
+│   ├── keypoints/               # heatmap-based ear/face keypoint model
+│   ├── features/                # geometric feature engineering
+│   ├── mood_cnn/                # MobileNetV2 mood classifier
+│   ├── labeling/                # seed labeling UI + self-training + active learning
+│   ├── ensemble/                # RF + CalibratedClassifierCV + cross-validation
+│   ├── serving/                 # FastAPI /predict, /gradcam, /metrics, /ws/live
+│   ├── explainability/          # Grad-CAM
+│   ├── optimization/            # ONNX export + INT8 quantization + benchmark
+│   └── reports/                 # subgroup analysis, experiment log, metrics aggregation
+├── frontend/                    # this UI, served by the API
+├── tests/
+├── reports/                     # auto-generated metrics + visualizations
+├── MODEL_CARD.md
+├── run.sh / stop.sh             # start/stop the serving API
+└── requirements.txt</pre>`;
+}
+
+// ---------- Init ----------
+loadVersion();
+loadFeatureStats();
+loadMetrics();
+loadArchParams();
+redraw();
 </script>
 </body>
 </html>

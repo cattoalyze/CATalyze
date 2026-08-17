@@ -8,6 +8,7 @@ Run with: uv run uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
 import base64
 import io
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -201,6 +202,53 @@ def metrics():
         raise HTTPException(status_code=404, detail="reports/metrics.json not found — run src.reports.generate_metrics first")
     with open(metrics_path) as f:
         return json.load(f)
+
+
+# Every one of these is a real report already written by a real
+# training/eval/analysis script (see README.md "Running the pipeline") —
+# this just serves whichever one the frontend asks for, verbatim, same
+# honesty contract as /metrics. Allowlisted so the frontend can't be used
+# to read arbitrary files off disk.
+_ALLOWED_REPORTS = {
+    "metrics", "ensemble_metrics", "ensemble_kfold_metrics", "keypoint_metrics",
+    "mood_cnn_metrics", "subgroup_analysis", "feature_stats", "onnx_benchmark",
+    "live_backend_benchmark", "anxious_supplement_experiment",
+}
+
+
+@app.get("/reports/{name}")
+def get_report(name: str):
+    if name not in _ALLOWED_REPORTS:
+        raise HTTPException(status_code=404, detail=f"unknown report: {name}")
+    path = resolve_path(cfg["paths"]["reports"]) / f"{name}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"reports/{name}.json not found — run the corresponding script first")
+    with open(path) as f:
+        return json.load(f)
+
+
+def _git_commit() -> str | None:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=Path(__file__).resolve().parent.parent.parent,
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout.strip()
+    except Exception:
+        return None
+
+
+@app.get("/version")
+def version():
+    """Real build metadata for the frontend's model/version badge — no
+    fabricated model name or version number. num_keypoints/backbone are
+    read from config.yaml, never hardcoded separately from it."""
+    return {
+        "git_commit": _git_commit(),
+        "keypoint_backbone": cfg["keypoints"]["backbone"],
+        "mood_cnn_backbone": cfg["mood_cnn"]["backbone"],
+        "num_keypoints": cfg["keypoints"]["num_keypoints"],
+        "mood_classes": cfg["mood_classes"],
+    }
 
 
 frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
